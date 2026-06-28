@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Monitoring Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#EDECEA; --panel:#ffffff; --ink:#1A1A1A; --muted:#7A7A75;
+    --line:#E2E0DC; --navy:#1E3A6E; --navy-soft:#E8EDF5;
+    /* badge confidence */
+    --ok:#2E7D52; --we:#C9A227; --all:#D9822B; --none:#C0392B;
+    --eventonly:#5B4B9E; --skip:#8A8A85;
+    /* aktual vs forecast */
+    --actual:#1E3A6E; --forecast:#9AA9C4; --budget:#C9A227;
+    --radius:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45}
+  button{font-family:inherit;cursor:pointer}
+  .hidden{display:none!important}
+  .muted{color:var(--muted)}
+  .right{text-align:right}
+
+  /* ===== LOGIN ===== */
+  #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:50}
+  .login-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:32px;width:320px;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+  .login-card h1{font-size:18px;margin-bottom:4px}
+  .login-card p{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .login-card label{display:block;font-size:12px;font-weight:600;margin-bottom:6px}
+  .login-card input{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;font-size:18px;letter-spacing:4px;text-align:center}
+  .login-card button{width:100%;margin-top:16px;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:14px}
+  .login-card button:disabled{opacity:.5}
+  .login-err{color:var(--none);font-size:13px;margin-top:12px;min-height:18px;text-align:center}
+
+  /* ===== HEADER ===== */
+  header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);z-index:30}
+  .hbar{display:flex;align-items:center;gap:16px;padding:12px 20px;flex-wrap:wrap}
+  .brand{font-weight:700;font-size:15px}
+  .brand small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+  .kpis{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+  .kpi{background:#F6F5F2;border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-width:120px;text-align:right}
+  .kpi .k-label{font-size:11px;color:#5B5B56;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+  .kpi .k-val{font-size:17px;font-weight:700;margin-top:2px}
+  .kpi.accent{background:#F6F5F2;border-color:var(--line)}
+  .kpi.accent .k-label{color:rgba(0,0,0,.55)}
+  .who{font-size:12px;color:var(--muted)}
+  .who button{margin-left:8px;background:none;border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--ink)}
+  .filterbar{display:flex;gap:12px;align-items:center;padding:10px 20px;background:#F2F1EF;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .filterbar select{padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:13px}
+  .filterbar label{font-size:12px;font-weight:600;color:var(--muted)}
+
+  /* ===== LAYOUT ===== */
+  main{max-width:1200px;margin:0 auto;padding:20px}
+  .section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:18px;overflow:hidden}
+  .sec-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .sec-head h2{font-size:14px;font-weight:700}
+  .sec-head .eyebrow{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .sec-body{padding:16px 18px}
+  .collapse-btn{background:none;border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:12px}
+
+  .chart-wrap{position:relative;height:300px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:4px;border-radius:2px;display:inline-block}
+  .swatch.dash{background:repeating-linear-gradient(90deg,var(--forecast) 0 4px,transparent 4px 7px);height:4px}
+
+  /* ===== TABLE (Section C) ===== */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:600;position:sticky;top:0;background:var(--panel)}
+  td.clickable{cursor:pointer;color:var(--navy);text-decoration:underline dotted;text-underline-offset:2px}
+  td.clickable:hover{background:var(--navy-soft)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;color:#fff;text-decoration:none}
+  .b-OK{background:var(--ok)} .b-POOLED_WE{background:var(--we)} .b-POOLED_ALL{background:var(--all)}
+  .b-NO_BASELINE{background:var(--none)} .b-EVENT_ONLY{background:var(--eventonly)}
+  .b-SKIP_SPECIAL{background:repeating-linear-gradient(45deg,var(--skip) 0 5px,#b9b9b3 5px 10px);color:#fff}
+  .b-none{background:#ddd;color:#666}
+
+  /* Achievement: oval pill (senada Confidence), bukan full-cell fill */
+  .ach-pill{display:inline-block;padding:2px 10px;border-radius:20px;
+    font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+  .ach-red{background:#F2D2D2;color:#8C2F2F}
+  .ach-orange{background:#F7E0C2;color:#8A5418}
+  .ach-yellow{background:#F6EFC0;color:#7A6A12}
+  .ach-green{background:#D9ECDE;color:#276B43}
+
+  /* Proporsi kolom tabel C (fixed layout supaya tidak terpotong di tepi) */
+  #tableC{table-layout:fixed}
+  #tableC th:nth-child(1),#tableC td:nth-child(1){width:30%}
+  #tableC th:nth-child(2),#tableC td:nth-child(2){width:22%}
+  #tableC th:nth-child(3),#tableC td:nth-child(3){width:18%}
+  #tableC th:nth-child(4),#tableC td:nth-child(4){width:16%}
+  #tableC th:nth-child(5),#tableC td:nth-child(5){width:14%}
+
+  #tableC td.col-mtd{font-weight:700;color:var(--navy)}
+  #tableC td.col-budget{font-weight:700;color:#6b5fae}
+
+  .outlet-name{font-weight:600}
+  .outlet-sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
+  .mtd-sub{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-top:1px}
+
+  .proj-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-weight:700;font-size:12.5px}
+  .proj-pill-OK{background:#E3F3EA;color:#1F6B40}
+  .proj-pill-POOLED_WE{background:#FBF1D6;color:#8A6A0E}
+  .proj-pill-POOLED_ALL{background:#FBE7D3;color:#9C5A1B}
+  .proj-pill-NO_BASELINE{background:#FBE0E0;color:#9C2A2A}
+  .proj-pill-EVENT_ONLY{background:#ECE8F7;color:#4A3D8F}
+  .proj-pill-SKIP_SPECIAL{background:#ECECEA;color:#5C5C58}
+  .proj-pill-none{background:#EFEFEF;color:#555}
+
+  /* Sort header */
+  #tableC thead th[data-sort]{cursor:pointer;user-select:none}
+  #tableC thead th[data-sort]:hover{color:var(--navy)}
+  #tableC thead th.sort-asc::after{content:" \25B2";font-size:9px}
+  #tableC thead th.sort-desc::after{content:" \25BC";font-size:9px}
+  /* Toggle segmented (Section B) */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{padding:5px 12px;border:none;background:#fff;font-size:12px;color:var(--muted)}
+  .seg button.active{background:var(--navy);color:#fff;font-weight:600}
+  /* Section B small multiples */
+  .sm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+  .sm-cell{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .sm-cell h4{font-size:12px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sm-cv{height:90px;position:relative}
+
+  /* ===== POPUP ===== */
+  #overlay{position:fixed;inset:0;background:rgba(20,20,25,.4);display:flex;align-items:center;justify-content:center;z-index:40;padding:16px}
+  .popup{background:var(--panel);border-radius:var(--radius);max-width:560px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+  .popup-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+  .popup-head h3{font-size:14px}
+  .popup-head .sub{font-size:12px;color:var(--muted);font-weight:400}
+  .popup-head button{background:none;border:none;font-size:20px;color:var(--muted)}
+  .popup-body{padding:14px 16px}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .kv span:first-child{flex:1 1 auto;min-width:0}
+  .kv .v{font-weight:600;flex:0 0 auto;white-space:nowrap;text-align:right}
+  .kv:last-child{border-bottom:none}
+  .kv .v{font-weight:600}
+  .ev{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px}
+  .ev .ev-top{display:flex;justify-content:space-between;font-size:12px}
+  .ev .ev-name{font-weight:600;font-size:13px;margin-bottom:2px}
+  .pill{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:600}
+  .pill.DEF{background:#E2F2E8;color:var(--ok)} .pill.TENT{background:#FBF1D8;color:#9a7d10}
+  .day-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;cursor:default}
+  .day-row .d{color:var(--muted)}
+
+  .loading{padding:40px;text-align:center;color:var(--muted)}
+  .err-banner{background:#FDECEA;border:1px solid #F5C6C2;color:#9a3027;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px}
+  @media(max-width:640px){
+    .kpis{width:100%;margin-left:0}
+    .kpi{flex:1;min-width:0}
+    th,td{padding:7px 6px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======== LOGIN ======== -->
+<div id="login">
+  <div class="login-card">
+    <h1>Finance Monitoring Dashboard</h1>
+    <p>Masukkan PIN untuk masuk.</p>
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off">
+    <button id="loginBtn">Masuk</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- ======== APP ======== -->
+<div id="app" class="hidden">
+  <header>
+    <div class="hbar">
+      <div class="brand">Finance Monitoring Dashboard<small id="periodLabel">—</small></div>
+      <div class="kpis">
+        <div class="kpi"><div class="k-label">Revenue MTD</div><div class="k-val" id="kpiMTD">—</div></div>
+        <div class="kpi"><div class="k-label">Forecast Akhir Bulan</div><div class="k-val" id="kpiProj">—</div></div>
+        <div class="kpi"><div class="k-label">Budget Bulan</div><div class="k-val" id="kpiBudget">—</div></div>
+        <div class="kpi accent" id="kpiAchCard"><div class="k-label">Achievement</div><div class="k-val" id="kpiAch">—</div></div>
+      </div>
+    </div>
+    <div class="filterbar">
+      <label>Cluster</label>
+      <select id="fCluster"><option value="ALL">Semua</option></select>
+      <label>Outlet</label>
+      <select id="fOutlet"><option value="ALL">Semua</option></select>
+      <span class="who" style="margin-left:auto">Masuk sebagai <b id="whoName">—</b> (<span id="whoRole">—</span>)
+        <button id="logoutBtn">Keluar</button></span>
+    </div>
+  </header>
+
+  <main>
+    <div id="errArea"></div>
+
+    <!-- SECTION A -->
+    <section class="section">
+      <div class="sec-head">
+        <div><div class="eyebrow">Section A</div><h2>Timeline Harian — Aktual & Forecast</h2></div>
+      </div>
+      <div class="sec-body">
+        <div class="chart-wrap"><canvas id="chartDaily"></canvas></div>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--actual)"></i> Aktual</span>
+          <span><i class="swatch dash"></i> Forecast (sisa bulan)</span>
+          <span><i class="swatch" style="background:var(--we);width:10px;height:10px;border-radius:50%"></i> Sabtu/Minggu</span>
+          <span><i class="swatch" style="background:var(--none);width:10px;height:10px;border-radius:50%"></i> Libur Nasional</span>
+          <span class="muted">Klik titik/bar untuk rincian hari itu</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION B -->
+    <section class="section">
+      <div class="sec-head">
+        <div><div class="eyebrow">Section B</div><h2>Tren Bulanan per Outlet (Aktual vs Budget)</h2></div>
+        <button class="collapse-btn" id="toggleB">Sembunyikan</button>
+      </div>
+      <div class="sec-body" id="bodyB">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+          <div class="seg" id="smToggle">
+            <button data-mode="month" class="active">Bulanan</button>
+            <button data-mode="day">Harian</button>
+          </div>
+          <div class="legend" id="smLegend" style="margin:0"></div>
+        </div>
+        <div id="smGrid" class="sm-grid"></div>
+      </div>
+    </section>
+
+    <!-- SECTION C -->
+    <section class="section">
+      <div class="sec-head">
+        <div><div class="eyebrow">Section C</div><h2>Per Outlet — MTD, Budget, Forecast</h2></div>
+        <span class="muted" style="font-size:12px">Klik angka MTD atau Forecast untuk detail per tanggal</span>
+      </div>
+      <div class="sec-body" style="overflow-x:auto">
+        <table id="tableC">
+          <thead><tr>
+            <th data-sort="outlet">Outlet</th><th data-sort="mtd">Revenue MTD</th>
+            <th data-sort="proj">Forecast</th><th data-sort="budget">Budget</th>
+            <th data-sort="ach">Achievement</th>
+          </tr></thead>
+          <tbody id="tcBody"></tbody>
+        </table>
+        <div class="legend" style="margin-top:12px">
+          <span class="muted" style="width:100%">Warna angka = keandalan forecast:</span>
+          <span><i class="swatch" style="background:var(--ok);width:10px;height:10px;border-radius:50%"></i> OK</span>
+          <span><i class="swatch" style="background:var(--we);width:10px;height:10px;border-radius:50%"></i> Pooled WE</span>
+          <span><i class="swatch" style="background:var(--all);width:10px;height:10px;border-radius:50%"></i> Pooled All</span>
+          <span><i class="swatch" style="background:var(--none);width:10px;height:10px;border-radius:50%"></i> No Baseline</span>
+          <span><i class="swatch" style="background:var(--eventonly);width:10px;height:10px;border-radius:50%"></i> Event Only</span>
+          <span><i class="swatch" style="background:var(--skip);width:10px;height:10px;border-radius:50%"></i> Hari Khusus</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION D -->
+    <section class="section">
+      <div class="sec-head">
+        <div><div class="eyebrow">Section D</div><h2>Forecast Event (bulan berjalan)</h2></div>
+      </div>
+      <div class="sec-body" style="overflow-x:auto">
+        <table id="tableD">
+          <thead><tr><th>Tanggal</th><th>Outlet</th><th style="text-align:left">Event</th><th>Pax</th><th>Nilai</th><th>Status</th></tr></thead>
+          <tbody id="tdBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ======== POPUP ======== -->
+<div id="overlay" class="hidden">
+  <div class="popup">
+    <div class="popup-head">
+      <div><h3 id="puTitle">—</h3><div class="sub" id="puSub">—</div></div>
+      <button id="puClose">&times;</button>
+    </div>
+    <div class="popup-body" id="puBody"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   KONFIG — GANTI URL INI dengan Web App URL kamu (/exec)
+   ========================================================= */
+const API_URL = "https://script.google.com/macros/s/AKfycbyit7vuZRUUcSljj6nq-74WrKnWipU6DKNYw2uoqfZyQcYnVYVdUmL5iXYm5tE39teUzA/exec";
+
+/* Ambang warna Achievement (proj/budget). Ubah di sini kalau mau geser. */
+/* Rule Achievement (proj/budget), urut diperiksa dari atas: */
+function achBand(ratio){
+  if(ratio==null||!isFinite(ratio)) return null;
+  if(ratio<0.8) return {cls:"ach-red", bg:"#F4777A", text:"#7A1F1F"};
+  if(ratio<0.9) return {cls:"ach-orange", bg:"#FFB85C", text:"#7A4A00"};
+  if(ratio<=1.0) return {cls:"ach-yellow", bg:"#FFF59D", text:"#7A6A00"};
+  return {cls:"ach-green", bg:"#C5E1A5", text:"#2F5D1F"};
+}
+const ACH_BANDS = { hi:1.05, lo:0.95 }; // >=hi hijau, <lo merah, sisanya kuning (cadangan, tak lagi dipakai)
+/* Nama tampilan untuk grup merge (kunci = key di MERGE_GROUPS). */
+const GROUP_DISPLAY = { "PATIO":"PATIO & PATB", "PLMT":"PLMT & RHJ" };
+
+/* ===== State ===== */
+const STATE = { token:null, role:null, allowed:null, name:null,
+  data:{}, currentMonth:null, lastActualDate:null,
+  outlets:[], clusters:[], rowsC:[], charts:{}, smMode:"month" };
+
+/* ===== Helper: panggil API (text/plain hindari CORS preflight) ===== */
+async function api(payload){
+  const res = await fetch(API_URL, {
+    method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(payload), redirect:"follow"
+  });
+  const txt = await res.text();
+  return JSON.parse(txt);
+}
+
+/* ===== Date helpers (TZ-safe: ambil 10 char pertama) ===== */
+function dstr(v){ // -> 'YYYY-MM-DD' apa pun bentuk inputnya
+  if(v==null) return "";
+  if(v instanceof Date){ // jaga-jaga kalau JSON kirim Date-like (tdk biasa)
+    return v.toISOString().slice(0,10);
+  }
+  const s = String(v);
+  return s.length>=10 ? s.slice(0,10) : s;
+}
+function ym(v){ return dstr(v).slice(0,7); }   // 'YYYY-MM'
+
+// Lookup jenis hari dari DIM_TANGGAL: 'WEEKEND' | 'LIBUR' | 'NORMAL', + nama hari pendek.
+const HARI_PENDEK={Senin:"Sen",Selasa:"Sel",Rabu:"Rab",Kamis:"Kam",Jumat:"Jum",Sabtu:"Sab",Minggu:"Min"};
+function dayInfoMap(){
+  if(STATE._dayInfo) return STATE._dayInfo;
+  const dim=STATE.data.DIM_TANGGAL||[]; const map={};
+  dim.forEach(d=>{
+    const date=dstr(d.Tanggal);
+    const isWeekend = d.Hari==="Sabtu"||d.Hari==="Minggu"|| String(d.Is_Weekend||"").toLowerCase()==="ya";
+    const isHoliday = String(d.Kategori_Hari||"").toUpperCase()==="LIBUR_NASIONAL";
+    map[date]={hari:d.Hari||"",pendek:HARI_PENDEK[d.Hari]||"",
+      type: isHoliday?"LIBUR":(isWeekend?"WEEKEND":"NORMAL"),
+      keterangan: d.Keterangan||""};
+  });
+  STATE._dayInfo=map; return map;
+}
+
+/* ===== Format angka -> Mio/Bio ===== */
+function fmt(n){
+  if(n==null||isNaN(n)) return "—";
+  const a=Math.abs(n);
+  if(a>=1e9) return (n/1e9).toFixed(2).replace(/\.?0+$/,"")+" Bio";
+  if(a>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"")+" Mio";
+  return n.toLocaleString("id-ID");
+}
+function pct(n){ return (n==null||!isFinite(n))?"—":(n*100).toFixed(0)+"%"; }
+
+/* ===== Rows->objects pakai headers ===== */
+function rowsToObjs(headers,rows){
+  return rows.map(r=>{const o={};headers.forEach((h,i)=>o[String(h).trim()]=r[i]);return o;});
+}
+
+/* =========================================================
+   LOGIN
+   ========================================================= */
+const $=id=>document.getElementById(id);
+$("loginBtn").onclick = doLogin;
+$("pin").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+
+async function doLogin(){
+  const pin=$("pin").value.trim();
+  $("loginErr").textContent="";
+  if(!pin){ $("loginErr").textContent="PIN belum diisi."; return; }
+  if(API_URL.indexOf("GANTI")===0){ $("loginErr").textContent="API_URL belum diisi di kode."; return; }
+  $("loginBtn").disabled=true; $("loginBtn").textContent="Memeriksa…";
+  try{
+    const r=await api({action:"login",pin});
+    if(!r.ok){ $("loginErr").textContent=r.error||"PIN salah."; return; }
+    STATE.token=r.token; STATE.role=r.role; STATE.allowed=r.allowed; STATE.name=r.nama;
+    $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+    $("whoName").textContent=r.nama; $("whoRole").textContent=r.role;
+    await boot();
+  }catch(e){ $("loginErr").textContent="Gagal terhubung: "+e.message; }
+  finally{ $("loginBtn").disabled=false; $("loginBtn").textContent="Masuk"; }
+}
+
+$("logoutBtn").onclick=async()=>{
+  try{ await api({action:"logout",token:STATE.token}); }catch(e){}
+  location.reload();
+};
+
+/* ===== ambil 1 tab, return objects (atau null kalau tak boleh/akses) ===== */
+async function getTab(tab){
+  const r=await api({action:"getData",token:STATE.token,tab});
+  if(!r.ok) return {error:r.error,rows:null};
+  return {rows:rowsToObjs(r.headers,r.rows),headers:r.headers};
+}
+
+/* =========================================================
+   BOOT — tarik data, hitung, render
+   ========================================================= */
+async function boot(){
+  showErr("");
+  const need=["Revenue_Master","Budget_Master","Forecast_Output","Event_Pipeline","DIM_UNIT","DIM_TANGGAL"];
+  const missing=[];
+  for(const t of need){
+    const r=await getTab(t);
+    if(r.rows===null){ missing.push(t+" ("+r.error+")"); STATE.data[t]=[]; }
+    else STATE.data[t]=r.rows;
+  }
+  if(missing.length){
+    showErr("Sebagian data tidak bisa diakses untuk role ini: "+missing.join("; ")+
+      ". Bagian terkait akan kosong.");
+  }
+
+  computePeriod();
+  buildFilters();
+  computeSectionC();
+  renderKPI();
+  renderTableC();
+  renderTableD();
+  renderDailyChart();
+  renderSmallMultiples();
+}
+
+/* ===== tentukan bulan berjalan = bulan dari tanggal aktual TERBARU ===== */
+function computePeriod(){
+  const rev=STATE.data.Revenue_Master||[];
+  let maxd="";
+  rev.forEach(r=>{const d=dstr(r.Tanggal); if(d>maxd) maxd=d;});
+  STATE.lastActualDate=maxd;
+  STATE.currentMonth=maxd.slice(0,7);
+  $("periodLabel").textContent="Periode: "+(STATE.currentMonth||"—")+
+    "  ·  data aktual s/d "+(maxd||"—");
+}
+
+/* ===== filter cluster (Grup) -> outlet, dari DIM_UNIT ===== */
+function buildFilters(){
+  const dim=STATE.data.DIM_UNIT||[];
+  const clusters=[...new Set(dim.map(d=>d.Grup).filter(Boolean))].sort();
+  STATE.clusters=clusters;
+  const fc=$("fCluster");
+  clusters.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;fc.appendChild(o);});
+  fillOutletOptions("ALL");
+  fc.onchange=()=>{ fillOutletOptions(fc.value); rerender(); };
+  $("fOutlet").onchange=rerender;
+}
+function fillOutletOptions(cluster){
+  const dim=STATE.data.DIM_UNIT||[];
+  const fo=$("fOutlet"); fo.innerHTML='<option value="ALL">Semua</option>';
+  const seen=new Set();
+  dim.filter(d=>cluster==="ALL"||d.Grup===cluster).forEach(d=>{
+    const g=memberOfGroup(d.Outlet);
+    const val=g||d.Outlet, txt=g?displayName(g):d.Outlet;
+    if(seen.has(val)) return; seen.add(val);
+    const o=document.createElement("option");o.value=val;o.textContent=txt;fo.appendChild(o);
+  });
+}
+function activeOutlets(){
+  const dim=STATE.data.DIM_UNIT||[];
+  const c=$("fCluster").value, o=$("fOutlet").value;
+  let list=dim.map(d=>d.Outlet);
+  if(c!=="ALL") list=dim.filter(d=>d.Grup===c).map(d=>d.Outlet);
+  if(o!=="ALL"){
+    const members = MERGE_GROUPS[o] || [o]; // kalau o = key grup -> lebarkan ke anggota
+    list=list.filter(x=>members.includes(x));
+  }
+  return list;
+}
+function rerender(){
+  computeSectionC(); renderKPI(); renderTableC(); renderDailyChart();
+  renderTableD(); renderSmallMultiples();
+}
+
+/* =========================================================
+   AGREGASI
+   ========================================================= */
+// budget lookup: kode Budget per Unit/Outlet. PLS khusus (TIGADARI+PIDARI -> PLS).
+function outletToBudgetKey(outlet){
+  if(outlet==="TIGADARI"||outlet==="PIDARI") return "PLS";
+  return outlet; // selain itu kode budget == nama outlet
+}
+function budgetFor(budgetKey,month){
+  const b=STATE.data.Budget_Master||[];
+  const row=b.find(x=>x.Unit===budgetKey && ym(x.Bulan)===month);
+  return row? Number(row.Budget)||0 : null;
+}
+
+// MTD aktual per outlet (bulan berjalan, s/d lastActualDate)
+function mtdByOutlet(){
+  const rev=STATE.data.Revenue_Master||[]; const m=STATE.currentMonth; const out={};
+  rev.forEach(r=>{ if(ym(r.Tanggal)===m){
+    const o=r.Outlet; out[o]=(out[o]||0)+(Number(r.Total_Revenue)||0);
+  }});
+  return out;
+}
+// Forecast sisa bulan per outlet: snapshot terbaru per Target_Date, hanya Target_Date>lastActual & bulan ini
+function forecastRemainByOutlet(){
+  const fc=STATE.data.Forecast_Output||[]; const m=STATE.currentMonth; const last=STATE.lastActualDate;
+  // collapse: per (Outlet,Target_Date) ambil Snapshot_Date terbesar
+  const best={};
+  fc.forEach(r=>{
+    const td=dstr(r.Target_Date); if(td.slice(0,7)!==m) return; if(td<=last) return;
+    const key=r.Outlet+"|"+td; const sd=dstr(r.Snapshot_Date);
+    if(!best[key]||sd>best[key]._sd){ best[key]={...r,_sd:sd,_td:td}; }
+  });
+  const out={};
+  Object.values(best).forEach(r=>{ out[r.Outlet]=(out[r.Outlet]||0)+(Number(r.Total)||0); });
+  return out;
+}
+function forecastDailyForOutlet(outlet){ // list {date,total,fbReg,event,flag} sisa bulan
+  const fc=STATE.data.Forecast_Output||[]; const m=STATE.currentMonth; const last=STATE.lastActualDate;
+  const best={};
+  fc.forEach(r=>{ if(r.Outlet!==outlet) return;
+    const td=dstr(r.Target_Date); if(td.slice(0,7)!==m||td<=last) return;
+    const sd=dstr(r.Snapshot_Date); if(!best[td]||sd>best[td]._sd) best[td]={...r,_sd:sd};
+  });
+  return Object.keys(best).sort().map(td=>({date:td,total:Number(best[td].Total)||0,
+    fbReg:Number(best[td].FB_Reg)||0,event:Number(best[td].Event)||0,flag:best[td].Flag}));
+}
+// Flag representatif per outlet = flag forecast Target_Date paling awal di sisa bulan
+function flagForOutlet(outlet){
+  const list=forecastDailyForOutlet(fcKey(outlet));
+  return list.length? list[0].flag : null;
+}
+
+// Event mendatang: ambil HANYA snapshot terbaru per Source_Outlet (tanpa Event_Key/nama).
+// Snapshot terakhir = kondisi pipeline terkini; event yg sudah batal otomatis hilang.
+function upcomingEvents(){
+  const ev=STATE.data.Event_Pipeline||[]; const m=STATE.currentMonth; const last=STATE.lastActualDate;
+  // tentukan snapshot terbaru tiap outlet (dari seluruh baris outlet itu, bukan cuma yg upcoming)
+  const latestSD={};
+  ev.forEach(r=>{ const o=String(r.Source_Outlet||r.Unit||"").trim(); const sd=dstr(r.Snapshot_Date);
+    if(!latestSD[o]||sd>latestSD[o]) latestSD[o]=sd; });
+  const out=[];
+  ev.forEach(r=>{
+    const o=String(r.Source_Outlet||r.Unit||"").trim(); const sd=dstr(r.Snapshot_Date);
+    if(sd!==latestSD[o]) return;                       // buang snapshot lama
+    const te=dstr(r.Tanggal_Event); if(te.slice(0,7)!==m||te<=last) return;
+    out.push({...r,_te:te,_sd:sd});
+  });
+  return out.sort((a,b)=>a._te.localeCompare(b._te));
+}
+// status -> DEF/TENT (pakai Status sbg sumber; flag konflik dgn Kategori)
+function statusClass(status){
+  const s=String(status||"").toLowerCase();
+  if(s==="confirmed"||s==="definite") return "DEF";
+  return "TENT";
+}
+
+/* ===== Section C rows: outlet yg digabung tampilannya =====
+   PLS: TIGADARI+PIDARI berbagi 1 kode budget (PLS) -> budget jgn dijumlah dobel.
+   PATIO: PATIO+PATB masing2 punya kode budget sendiri -> budget dijumlah biasa.
+   Pola umum: per grup, jumlah revenue semua anggota; jumlah budget per KODE BUDGET
+   UNIK saja (set, bukan per-outlet) supaya kode yg dipakai bersama tak dobel. */
+const MERGE_GROUPS = { "PLS":["TIGADARI","PIDARI"], "PATIO":["PATIO","PATB"], "PLMT":["PLMT","RHJ"] };
+// Forecast_Output tidak punya baris TIGADARI/PIDARI terpisah - sumbernya cuma "PLS" (sudah pre-agregat).
+const FC_OUTLET_ALIAS = { "TIGADARI":"PLS", "PIDARI":"PLS" };
+function fcKey(outlet){ return FC_OUTLET_ALIAS[outlet] || outlet; }
+function memberOfGroup(outlet){
+  for(const g in MERGE_GROUPS) if(MERGE_GROUPS[g].includes(outlet)) return g;
+  return null;
+}
+function displayName(key){ return GROUP_DISPLAY[key] || key; }
+// grup punya budget terpisah (tiap anggota kode sendiri) -> budget bisa di-breakdown
+function hasSplitBudget(groupKey){
+  const m=MERGE_GROUPS[groupKey]||[];
+  const keys=new Set(m.map(outletToBudgetKey));
+  return keys.size===m.length;
+}
+function computeSectionC(){
+  const dim=STATE.data.DIM_UNIT||[];
+  const mtd=mtdByOutlet(), fcr=forecastRemainByOutlet();
+  const act=activeOutlets();
+  const rows=[]; const groupAcc={}; const groupShown={};
+
+  dim.forEach(d=>{
+    const o=d.Outlet;
+    if(!act.includes(o)) return;
+    const g=memberOfGroup(o);
+    if(g){
+      if(!groupAcc[g]) groupAcc[g]={mtd:0,fcr:0,budgetKeys:new Set(),fcSeen:new Set(),flag:null,type:d.Unit_Type,cluster:null,unit:null};
+      groupAcc[g].mtd+=mtd[o]||0;
+      { const fk=fcKey(o); if(!groupAcc[g].fcSeen.has(fk)){ groupAcc[g].fcSeen.add(fk); groupAcc[g].fcr+=fcr[fk]||0; } }
+      groupAcc[g].budgetKeys.add(outletToBudgetKey(o));
+      if(!groupAcc[g].flag) groupAcc[g].flag=flagForOutlet(o);
+      if(groupAcc[g].cluster==null) groupAcc[g].cluster=d.Grup;
+      else if(groupAcc[g].cluster!==d.Grup) groupAcc[g].cluster="Multi cluster";
+      if(groupAcc[g].unit==null) groupAcc[g].unit=d.Nama_Display;
+      else if(d.Nama_Display && !groupAcc[g].unit.includes(d.Nama_Display)) groupAcc[g].unit += " · "+d.Nama_Display;
+      if(!groupShown[g]){ groupShown[g]=true; rows.push({_group:g,outlet:g}); }
+      return;
+    }
+    const mt=mtd[o]||0, fr=fcr[o]||0;
+    const bk=outletToBudgetKey(o), bud=budgetFor(bk,STATE.currentMonth);
+    rows.push({outlet:o,unit:d.Nama_Display,type:d.Unit_Type,cluster:d.Grup,mtd:mt,budget:bud,
+      proj:mt+fr,flag:flagForOutlet(o)});
+  });
+  rows.forEach(r=>{ if(r._group){
+    const acc=groupAcc[r._group];
+    let bud=0; acc.budgetKeys.forEach(k=>{ bud += budgetFor(k,STATE.currentMonth)||0; });
+    r.mtd=acc.mtd; r.budget=bud; r.proj=acc.mtd+acc.fcr; r.flag=acc.flag; r.cluster=acc.cluster; r.unit=acc.unit;
+  }});
+  STATE.rowsC=rows;
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function renderKPI(){
+  const rows=STATE.rowsC;
+  const mtd=rows.reduce((s,r)=>s+(r.mtd||0),0);
+  const proj=rows.reduce((s,r)=>s+(r.proj||0),0);
+  const bud=rows.reduce((s,r)=>s+(r.budget||0),0);
+  $("kpiMTD").textContent=fmt(mtd);
+  $("kpiProj").textContent=fmt(proj);
+  $("kpiBudget").textContent=fmt(bud);
+  const ratio = bud>0? proj/bud : null;
+  $("kpiAch").textContent= ratio!=null? pct(ratio):"—";
+  const band=achBand(ratio);
+  $("kpiAch").style.color = band? band.text : "";
+}
+
+function sortRowsC(rows){
+  const s=STATE.sortC; if(!s) return rows;
+  const val=(r)=>{
+    if(s.key==="outlet") return (r._group?displayName(r.outlet):r.outlet).toLowerCase();
+    if(s.key==="ach") return (r.budget>0)? r.proj/r.budget : -Infinity;
+    return r[s.key]==null? -Infinity : r[s.key];
+  };
+  return [...rows].sort((a,b)=>{
+    const va=val(a), vb=val(b);
+    return va<vb? -s.dir : va>vb? s.dir : 0;
+  });
+}
+function renderTableC(){
+  const tb=$("tcBody"); tb.innerHTML="";
+  sortRowsC(STATE.rowsC).forEach(r=>{
+    const tr=document.createElement("tr");
+    const ratio = (r.budget>0)? (r.proj/r.budget) : null;
+    const ach = (ratio!=null)? pct(ratio) : "—";
+    const band = achBand(ratio);
+    const achCls = band? band.cls : "";
+    const isGrp = !!r._group, splitBud = isGrp && hasSplitBudget(r._group);
+    const budCell = (r.budget==null)? `<td class="col-budget">—</td>`
+      : splitBud
+        ? `<td class="clickable col-budget" data-act="budget" data-o="${r.outlet}">${fmt(r.budget)}</td>`
+        : `<td class="col-budget">${fmt(r.budget)}</td>`;
+    const projFlag = r.flag || "none";
+    const projTitle = r.flag ? flagLabelText(r.flag) : "Tanpa flag forecast";
+    const days=Number((STATE.lastActualDate||"").slice(8,10))||1;
+    const avgDay=r.mtd/days;
+    tr.innerHTML=
+      `<td><span class="outlet-name">${r._group?displayName(r.outlet):r.outlet}</span>`+
+        `<span class="outlet-sub">${r.unit||r.cluster||"—"}</span></td>`+
+      `<td class="clickable col-mtd" data-act="mtd" data-o="${r.outlet}">${fmt(r.mtd)}`+
+        `<span class="mtd-sub">${fmt(avgDay)}/hari</span></td>`+
+      `<td class="clickable" data-act="proj" data-o="${r.outlet}" title="${projTitle}">`+
+        `<span class="proj-pill proj-pill-${projFlag}">${fmt(r.proj)}</span></td>`+
+      budCell+
+      `<td><span class="ach-pill ${achCls}">${ach}</span></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("td.clickable").forEach(td=>{
+    td.onclick=()=>{
+      if(td.dataset.act==="budget") openBudgetPopup(td.dataset.o);
+      else openCellPopup(td.dataset.act,td.dataset.o);
+    };
+  });
+}
+function flagLabelText(f){
+  return {OK:"Tinggi",POOLED_WE:"Sedang",POOLED_ALL:"Rendah",
+    NO_BASELINE:"No baseline",EVENT_ONLY:"Event only",SKIP_SPECIAL:"Hari khusus"}[f]||f;
+}
+
+function renderTableD(){
+  const tb=$("tdBody"); tb.innerHTML="";
+  const ev=upcomingEvents();
+  const act=activeOutlets();
+  const filtered=ev.filter(e=>act.includes(e.Source_Outlet)||act.includes(e.Unit));
+  if(!filtered.length){ tb.innerHTML='<tr><td colspan="6" class="muted">Tidak ada event mendatang bulan ini.</td></tr>'; return; }
+  filtered.forEach(e=>{
+    const cls=statusClass(e.Status);
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${e._te}</td><td>${e.Source_Outlet||e.Unit}</td>`+
+      `<td style="white-space:normal;text-align:left">${e.Nama_Event||"—"}</td>`+
+      `<td>${e.Pax||"—"}</td><td>${fmt(Number(e.Nilai_Event)||0)}</td>`+
+      `<td><span class="pill ${cls}" title="${e.Status}">${cls}</span></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ===== Section A: timeline aktual + forecast (1 outlet kalau dipilih, else total) ===== */
+function dailySeries(){
+  const rev=STATE.data.Revenue_Master||[]; const m=STATE.currentMonth;
+  const act=activeOutlets();
+  // aktual per tanggal (jumlah outlet aktif)
+  const actual={};
+  rev.forEach(r=>{ if(ym(r.Tanggal)===m && act.includes(r.Outlet)){
+    const d=dstr(r.Tanggal); actual[d]=(actual[d]||0)+(Number(r.Total_Revenue)||0);
+  }});
+  // forecast per tanggal (jumlah outlet aktif), sisa bulan
+  const fmap={};
+  [...new Set(act.map(fcKey))].forEach(k=>forecastDailyForOutlet(k).forEach(x=>{ fmap[x.date]=(fmap[x.date]||0)+x.total; }));
+  const last=STATE.lastActualDate;
+  if(last && actual[last]!=null && fmap[last]==null) fmap[last]=actual[last];
+  // gabungkan semua tanggal terurut
+  const allDates=[...new Set([...Object.keys(actual),...Object.keys(fmap)])].sort();
+  return {dates:allDates,
+    actual:allDates.map(d=>actual[d]!=null?actual[d]:null),
+    forecast:allDates.map(d=>fmap[d]!=null?fmap[d]:null)};
+}
+function renderDailyChart(){
+  const s=dailySeries();
+  const dInfo=dayInfoMap();
+  const labels=s.dates.map(d=>{
+    const info=dInfo[d]; const dom=d.slice(8);
+    return info&&info.pendek? dom+" "+info.pendek : dom;
+  });
+  // warna titik: libur nasional > weekend > normal (mengikuti warna seri aktual/forecast, sekadar ring beda)
+  function ptColor(baseColor,date){
+    const info=dInfo[date];
+    if(info&&info.type==="LIBUR") return getCSS("--none");
+    if(info&&info.type==="WEEKEND") return getCSS("--we");
+    return baseColor;
+  }
+  const actualColor=getCSS("--actual"), forecastColor=getCSS("--forecast");
+  const inkColor=getCSS("--ink"), weColor=getCSS("--we"), liburColor=getCSS("--none");
+  function tickColor(idx){
+    const info=dInfo[s.dates[idx]];
+    if(info&&info.type==="LIBUR") return liburColor;
+    if(info&&info.type==="WEEKEND") return weColor;
+    return inkColor;
+  }
+  const ctx=$("chartDaily");
+  if(STATE.charts.daily) STATE.charts.daily.destroy();
+  STATE.charts.daily=new Chart(ctx,{
+    type:"line",
+    data:{labels:labels,
+      datasets:[
+        {label:"Aktual",data:s.actual,borderColor:actualColor,backgroundColor:actualColor,
+         tension:.25,spanGaps:false,pointRadius:4,
+         pointBackgroundColor:s.dates.map(d=>ptColor(actualColor,d)),
+         pointBorderColor:s.dates.map(d=>ptColor(actualColor,d))},
+        {label:"Forecast",data:s.forecast,borderColor:forecastColor,borderDash:[5,4],
+         backgroundColor:forecastColor,tension:.25,spanGaps:false,pointRadius:4,
+         pointBackgroundColor:s.dates.map(d=>ptColor(forecastColor,d)),
+         pointBorderColor:s.dates.map(d=>ptColor(forecastColor,d))}
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{
+          title:(items)=>{
+            const i=items[0].dataIndex; const d=s.dates[i]; const info=dInfo[d];
+            let t=d+(info&&info.hari? " ("+info.hari+")":"");
+            return t;
+          },
+          afterTitle:(items)=>{
+            const i=items[0].dataIndex; const info=dInfo[s.dates[i]];
+            return (info&&info.type==="LIBUR"&&info.keterangan)? "Libur: "+info.keterangan : "";
+          },
+          label:c=>c.dataset.label+": "+fmt(c.parsed.y)
+        }}},
+      scales:{
+        x:{ ticks:{ color:(ctx)=>tickColor(ctx.index) } },
+        y:{ ticks:{callback:v=>fmt(v)} }
+      },
+      onClick:(e,els)=>{ if(els.length){ const i=els[0].index; openDayPopup(s.dates[i]); } }
+    }
+  });
+}
+
+/* ===== Section B: small multiples — tren bulanan per outlet (merge-aware) ===== */
+function activeDisplayUnits(){
+  const seen=new Set(); const out=[];
+  activeOutlets().forEach(o=>{ const key=memberOfGroup(o)||o;
+    if(!seen.has(key)){ seen.add(key); out.push(key); } });
+  return out;
+}
+function monthlySeriesForUnit(key,curYear){
+  const members=MERGE_GROUPS[key]||[key];
+  const rev=STATE.data.Revenue_Master||[], bud=STATE.data.Budget_Master||[];
+  const actByM={}, budByM={};
+  rev.forEach(r=>{ if(members.includes(r.Outlet)){ const m=ym(r.Tanggal);
+    if(m.slice(0,4)===curYear) actByM[m]=(actByM[m]||0)+(Number(r.Total_Revenue)||0); }});
+  const budKeys=[...new Set(members.map(outletToBudgetKey))];
+  bud.forEach(b=>{ if(budKeys.includes(b.Unit)){ const m=ym(b.Bulan);
+    if(m.slice(0,4)===curYear) budByM[m]=(budByM[m]||0)+(Number(b.Budget)||0); }});
+  return {actByM,budByM};
+}
+function dailySeriesForUnit(key){
+  const members=MERGE_GROUPS[key]||[key];
+  const rev=STATE.data.Revenue_Master||[]; const m=STATE.currentMonth;
+  const actual={};
+  rev.forEach(r=>{ if(members.includes(r.Outlet) && ym(r.Tanggal)===m){
+    const d=dstr(r.Tanggal); actual[d]=(actual[d]||0)+(Number(r.Total_Revenue)||0); }});
+  const fmap={};
+  [...new Set(members.map(fcKey))].forEach(k=>forecastDailyForOutlet(k).forEach(x=>{ fmap[x.date]=(fmap[x.date]||0)+x.total; }));
+  const dates=[...new Set([...Object.keys(actual),...Object.keys(fmap)])].sort();
+  return {dates,
+    actual:dates.map(d=>actual[d]!=null?actual[d]:null),
+    forecast:dates.map(d=>fmap[d]!=null?fmap[d]:null)};
+}
+function smLegend(){
+  const el=$("smLegend"); if(!el) return;
+  const a=getCSS("--actual"), b=getCSS("--budget"), f=getCSS("--forecast");
+  el.innerHTML = (STATE.smMode==="day")
+    ? `<span><i class="swatch" style="background:${a}"></i> Aktual</span>`+
+      `<span><i class="swatch dash"></i> Forecast</span>`+
+      `<span class="muted">Tiap kotak = satu outlet</span>`
+    : `<span><i class="swatch" style="background:${a}"></i> Aktual</span>`+
+      `<span><i class="swatch" style="background:${b}"></i> Budget</span>`+
+      `<span class="muted">Tiap kotak = satu outlet</span>`;
+}
+function renderSmallMultiples(){
+  const grid=$("smGrid"); if(!grid) return;
+  (STATE.charts.sm||[]).forEach(c=>{try{c.destroy();}catch(e){}});
+  STATE.charts.sm=[]; grid.innerHTML=""; smLegend();
+  const units=activeDisplayUnits();
+  if(!units.length){ grid.innerHTML='<div class="muted">Tidak ada unit untuk filter ini.</div>'; return; }
+  const actC=getCSS("--actual"), budC=getCSS("--budget"), fcC=getCSS("--forecast");
+  const rev=STATE.data.Revenue_Master||[];
+  const curYear=(STATE.currentMonth||"").slice(0,4);
+  const months=[...new Set(rev.map(r=>ym(r.Tanggal)))].filter(m=>m.slice(0,4)===curYear).sort();
+
+  units.forEach(key=>{
+    const cell=document.createElement("div"); cell.className="sm-cell";
+    cell.innerHTML=`<h4 title="${displayName(key)}">${displayName(key)}</h4><div class="sm-cv"><canvas></canvas></div>`;
+    grid.appendChild(cell);
+    const cv=cell.querySelector("canvas");
+    let cfg;
+    if(STATE.smMode==="day"){
+      const s=dailySeriesForUnit(key);
+      cfg={type:"line",
+        data:{labels:s.dates.map(d=>d.slice(8)),datasets:[
+          {label:"Aktual",data:s.actual,borderColor:actC,backgroundColor:actC,tension:.25,spanGaps:false,pointRadius:0,borderWidth:2},
+          {label:"Forecast",data:s.forecast,borderColor:fcC,borderDash:[4,3],backgroundColor:fcC,tension:.25,spanGaps:false,pointRadius:0,borderWidth:1.5}
+        ]}};
+    } else {
+      const {actByM,budByM}=monthlySeriesForUnit(key,curYear);
+      cfg={type:"line",
+        data:{labels:months.map(m=>m.slice(5)),datasets:[
+          {label:"Aktual",data:months.map(m=>actByM[m]||0),borderColor:actC,backgroundColor:actC,tension:.25,pointRadius:2,borderWidth:2},
+          {label:"Budget",data:months.map(m=>budByM[m]||0),borderColor:budC,backgroundColor:budC,borderDash:[4,3],tension:.25,pointRadius:0,borderWidth:1.5}
+        ]}};
+    }
+    cfg.options={responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.parsed.y)}}},
+      scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:9},callback:v=>fmt(v)}}}};
+    STATE.charts.sm.push(new Chart(cv,cfg));
+  });
+}
+function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+/* =========================================================
+   POPUP
+   ========================================================= */
+function openOverlay(title,sub){ $("puTitle").textContent=title; $("puSub").textContent=sub||"";
+  $("overlay").classList.remove("hidden"); }
+$("puClose").onclick=()=>$("overlay").classList.add("hidden");
+$("overlay").onclick=e=>{ if(e.target.id==="overlay") $("overlay").classList.add("hidden"); };
+
+// klik sel: act='mtd' -> rincian aktual harian; act='proj' -> rincian forecast harian
+function openCellPopup(act,outlet){
+  const body=$("puBody"); body.innerHTML="";
+  if(act==="mtd"){
+    openOverlay(displayName(outlet)+" — Aktual MTD","Rincian harian, "+STATE.currentMonth);
+    const rev=STATE.data.Revenue_Master||[]; const m=STATE.currentMonth;
+    const parts = MERGE_GROUPS[outlet]||[outlet];
+    const byDate={};
+    rev.forEach(r=>{ if(ym(r.Tanggal)===m && parts.includes(r.Outlet)){
+      const d=dstr(r.Tanggal); byDate[d]=(byDate[d]||0)+(Number(r.Total_Revenue)||0);
+    }});
+    const dates=Object.keys(byDate).sort();
+    if(!dates.length){ body.innerHTML='<div class="muted">Belum ada data.</div>'; return; }
+    dates.forEach(d=>{ body.insertAdjacentHTML("beforeend",
+      `<div class="day-row"><span class="d">${d}</span><span>${fmt(byDate[d])}</span></div>`); });
+    body.insertAdjacentHTML("beforeend",
+      `<div class="kv" style="margin-top:8px"><span>Total MTD</span><span class="v">${fmt(dates.reduce((s,d)=>s+byDate[d],0))}</span></div>`);
+  } else {
+    openOverlay(displayName(outlet)+" — Forecast sisa bulan","Forecast harian, "+STATE.currentMonth);
+    const parts = MERGE_GROUPS[outlet]||[outlet];
+    const merged={};
+    [...new Set(parts.map(fcKey))].forEach(o=>forecastDailyForOutlet(o).forEach(x=>{
+      if(!merged[x.date]) merged[x.date]={date:x.date,total:0,fbReg:0,event:0,flag:x.flag};
+      merged[x.date].total+=x.total; merged[x.date].fbReg+=x.fbReg; merged[x.date].event+=x.event;
+    }));
+    const list=Object.keys(merged).sort().map(d=>merged[d]);
+    if(!list.length){ body.innerHTML='<div class="muted">Tidak ada forecast sisa bulan.</div>'; return; }
+    list.forEach(x=>{
+      const evList = eventsForDate(parts,x.date);
+      let html=`<div class="ev"><div class="ev-top"><span class="ev-name">${x.date}</span>`+
+        `<span class="badge b-${x.flag} " style="font-size:10px">${flagLabelText(x.flag)}</span></div>`+
+        `<div class="kv"><span>Reguler (FB)</span><span class="v">${fmt(x.fbReg)}</span></div>`+
+        `<div class="kv"><span>Event</span><span class="v">${fmt(x.event)}</span></div>`;
+      evList.forEach(e=>{ const cls=statusClass(e.Status);
+        html+=`<div class="kv"><span>· ${e.Nama_Event} <span class="pill ${cls}" title="${e.Status}">${cls}</span></span>`+
+              `<span class="v">${fmt(Number(e.Nilai_Event)||0)}</span></div>`; });
+      html+=`<div class="kv"><span><b>Total hari</b></span><span class="v">${fmt(x.total)}</span></div></div>`;
+      body.insertAdjacentHTML("beforeend",html);
+    });
+  }
+}
+function eventsForDate(outlets,date){
+  return upcomingEvents().filter(e=> e._te===date &&
+    (outlets.includes(e.Source_Outlet)||outlets.includes(e.Unit)));
+}
+
+// klik sel Budget pada grup budget-terpisah -> breakdown per anggota (MTD / Forecast / Budget)
+function openBudgetPopup(groupKey){
+  const body=$("puBody"); body.innerHTML="";
+  openOverlay(displayName(groupKey)+" — Rincian per outlet","MTD · Forecast sisa · Budget, "+STATE.currentMonth);
+  const members=MERGE_GROUPS[groupKey]||[groupKey];
+  const mtd=mtdByOutlet(), fcr=forecastRemainByOutlet();
+  const fcSeen=new Set();
+  let tM=0,tF=0,tB=0;
+  let html='<table style="width:100%"><thead><tr>'+
+    '<th>Outlet</th><th>MTD</th><th>Forecast</th><th>Budget</th></tr></thead><tbody>';
+  members.forEach(o=>{
+    const fk=fcKey(o); const fr = fcSeen.has(fk)? 0 : (fcSeen.add(fk), fcr[fk]||0);
+    const mt=mtd[o]||0, bud=budgetFor(outletToBudgetKey(o),STATE.currentMonth);
+    tM+=mt; tF+=fr; tB+=(bud||0);
+    html+=`<tr><td>${o}</td><td class="right">${fmt(mt)}</td>`+
+      `<td class="right">${fmt(fr)}</td><td class="right">${bud==null?"—":fmt(bud)}</td></tr>`;
+  });
+  html+=`<tr style="font-weight:600"><td>Total</td><td class="right">${fmt(tM)}</td>`+
+    `<td class="right">${fmt(tF)}</td><td class="right">${fmt(tB)}</td></tr>`;
+  html+='</tbody></table>';
+  body.innerHTML=html;
+}
+
+// klik titik chart Section A -> popup hari itu (aktual=summary / forecast=detail)
+function openDayPopup(date){
+  const body=$("puBody"); body.innerHTML="";
+  const act=activeOutlets();
+  const isForecast = date>STATE.lastActualDate;
+  if(!isForecast){
+    openOverlay("Aktual "+date,"Ringkasan outlet aktif");
+    const rev=STATE.data.Revenue_Master||[];
+    let reguler=0,evt=0,tot=0;
+    rev.forEach(r=>{ if(dstr(r.Tanggal)===date && act.includes(r.Outlet)){
+      reguler+=(Number(r.Food)||0)+(Number(r.Beverage)||0)+(Number(r.Other)||0);
+      evt+=Number(r.Event)||0; tot+=Number(r.Total_Revenue)||0; }});
+    body.innerHTML=
+      `<div class="kv"><span>Reguler</span><span class="v">${fmt(reguler)}</span></div>`+
+      `<div class="kv"><span>Event</span><span class="v">${fmt(evt)}</span></div>`+
+      `<div class="kv"><span><b>Total Revenue</b></span><span class="v">${fmt(tot)}</span></div>`;
+  } else {
+    openOverlay("Forecast "+date,"Forecast + rincian event");
+    let fbReg=0,evt=0,tot=0;
+    [...new Set(act.map(fcKey))].forEach(o=>forecastDailyForOutlet(o).forEach(x=>{ if(x.date===date){
+      fbReg+=x.fbReg; evt+=x.event; tot+=x.total; }}));
+    let html=`<div class="kv"><span>Reguler (FB)</span><span class="v">${fmt(fbReg)}</span></div>`+
+      `<div class="kv"><span>Event (forecast)</span><span class="v">${fmt(evt)}</span></div>`+
+      `<div class="kv"><span><b>Total Forecast</b></span><span class="v">${fmt(tot)}</span></div>`;
+    const evs=upcomingEvents().filter(e=>e._te===date && (act.includes(e.Source_Outlet)||act.includes(e.Unit)));
+    if(evs.length){ html+='<div style="margin-top:10px;font-size:12px;color:var(--muted)">Rincian event:</div>';
+      evs.forEach(e=>{ const cls=statusClass(e.Status);
+        html+=`<div class="ev"><div class="ev-name">${e.Nama_Event}</div>`+
+          `<div class="ev-top"><span>${e.Source_Outlet||e.Unit} · ${e.Pax||"—"} pax</span>`+
+          `<span class="pill ${cls}" title="${e.Status}">${cls}</span></div>`+
+          `<div class="kv"><span>Nilai</span><span class="v">${fmt(Number(e.Nilai_Event)||0)}</span></div></div>`; });
+    }
+    body.innerHTML=html;
+  }
+}
+
+/* ===== Section B collapse ===== */
+$("toggleB").onclick=()=>{
+  const b=$("bodyB"); const hidden=b.classList.toggle("hidden");
+  $("toggleB").textContent=hidden?"Tampilkan":"Sembunyikan";
+};
+/* ===== Section B toggle Bulanan/Harian ===== */
+$("smToggle").onclick=(e)=>{
+  const btn=e.target.closest("button[data-mode]"); if(!btn) return;
+  STATE.smMode=btn.dataset.mode;
+  $("smToggle").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b===btn));
+  renderSmallMultiples();
+};
+/* TAMBAHKAN setelah blok $("smToggle").onclick=...; */
+document.querySelectorAll('#tableC thead th[data-sort]').forEach(th=>{
+  th.onclick=()=>{
+    const k=th.dataset.sort;
+    STATE.sortC = (STATE.sortC && STATE.sortC.key===k) ? {key:k,dir:STATE.sortC.dir*-1} : {key:k,dir:1};
+    document.querySelectorAll('#tableC thead th[data-sort]').forEach(t=>t.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(STATE.sortC.dir===1?'sort-asc':'sort-desc');
+    renderTableC();
+  };
+});
+
+/* ===== util ===== */
+function showErr(msg){ const a=$("errArea");
+  a.innerHTML = msg? `<div class="err-banner">${msg}</div>` : ""; }
+</script>
+</body>
+</html>
