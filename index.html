@@ -395,6 +395,13 @@ async function getTab(tab){
   return {rows:rowsToObjs(r.headers,r.rows),headers:r.headers};
 }
 
+/* ===== ambil banyak tab dalam 1 eksekusi script (lebih cepat dari getTab x N) ===== */
+async function getTabsBatch(tabs){
+  const r=await api({action:"getDataBatch",token:STATE.token,tabs});
+  if(!r.ok) throw new Error(r.error||"getDataBatch gagal");
+  return r.results; // {tabName: {ok,headers,rows,...} atau {ok:false,error}}
+}
+
 /* =========================================================
    BOOT — tarik data, hitung, render
    ========================================================= */
@@ -402,11 +409,14 @@ async function boot(){
   showErr("");
   const need=["Revenue_Master","Budget_Master","Forecast_Output","Event_Pipeline","DIM_UNIT","DIM_TANGGAL"];
   const missing=[];
-  for(const t of need){
-    const r=await getTab(t);
-    if(r.rows===null){ missing.push(t+" ("+r.error+")"); STATE.data[t]=[]; }
-    else STATE.data[t]=r.rows;
-  }
+  let results;
+  try{ results = await getTabsBatch(need); }
+  catch(e){ showErr("Gagal mengambil data: "+e.message); return; }
+  need.forEach(t=>{
+    const r=results[t];
+    if(!r || !r.ok){ missing.push(t+" ("+((r&&r.error)||"tidak ada respons")+")"); STATE.data[t]=[]; }
+    else STATE.data[t]=rowsToObjs(r.headers,r.rows);
+  });
   if(missing.length){
     showErr("Sebagian data tidak bisa diakses untuk role ini: "+missing.join("; ")+
       ". Bagian terkait akan kosong.");
