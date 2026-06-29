@@ -906,7 +906,7 @@ function openCellPopup(act,outlet){
       evList.forEach(e=>{ const cls=statusClass(e.Status);
         html+=`<div class="kv"><span>· ${e.Nama_Event} <span class="pill ${cls}" title="${e.Status}">${cls}</span></span>`+
               `<span class="v">${fmt(Number(e.Nilai_Event)||0)}</span></div>`; });
-      html+=`<div class="kv"><span><b>Total hari</b></span><span class="v">${fmt(x.total)}</span></div></div>`;
+      html+=`<div class="kv"><span><b>Total Revenue</b></span><span class="v">${fmt(x.total)}</span></div></div>`;
       body.insertAdjacentHTML("beforeend",html);
     });
   }
@@ -948,10 +948,10 @@ function openDayPopup(date){
   if(!isForecast){
     openOverlay("Aktual "+date,"Ringkasan outlet aktif");
     const rev=STATE.data.Revenue_Master||[];
-    let reguler=0,evt=0,tot=0;
+    let evt=0,tot=0;
     rev.forEach(r=>{ if(dstr(r.Tanggal)===date && act.includes(r.Outlet)){
-      reguler+=(Number(r.Food)||0)+(Number(r.Beverage)||0)+(Number(r.Other)||0);
       evt+=Number(r.Event)||0; tot+=Number(r.Total_Revenue)||0; }});
+    const reguler = tot - evt;
     body.innerHTML=
       `<div class="kv"><span>Reguler</span><span class="v">${fmt(reguler)}</span></div>`+
       `<div class="kv"><span>Event</span><span class="v">${fmt(evt)}</span></div>`+
