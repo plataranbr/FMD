@@ -676,7 +676,8 @@ function renderTableD(){
   const tb=$("tdBody"); tb.innerHTML="";
   const ev=upcomingEvents();
   const act=activeOutlets();
-  const filtered=ev.filter(e=>act.includes(e.Source_Outlet)||act.includes(e.Unit));
+  const actFc=new Set(act.map(fcKey));
+  const filtered=ev.filter(e=>actFc.has(e.Source_Outlet)||actFc.has(e.Unit));
   if(!filtered.length){ tb.innerHTML='<tr><td colspan="6" class="muted">Tidak ada event mendatang bulan ini.</td></tr>'; return; }
   filtered.forEach(e=>{
     const cls=statusClass(e.Status);
@@ -901,8 +902,9 @@ function openCellPopup(act,outlet){
   }
 }
 function eventsForDate(outlets,date){
+  const outletsFc=new Set(outlets.map(fcKey));
   return upcomingEvents().filter(e=> e._te===date &&
-    (outlets.includes(e.Source_Outlet)||outlets.includes(e.Unit)));
+    (outletsFc.has(e.Source_Outlet)||outletsFc.has(e.Unit)));
 }
 
 // klik sel Budget pada grup budget-terpisah -> breakdown per anggota (MTD / Forecast / Budget)
@@ -952,7 +954,7 @@ function openDayPopup(date){
     let html=`<div class="kv"><span>Reguler (FB)</span><span class="v">${fmt(fbReg)}</span></div>`+
       `<div class="kv"><span>Event (forecast)</span><span class="v">${fmt(evt)}</span></div>`+
       `<div class="kv"><span><b>Total Forecast</b></span><span class="v">${fmt(tot)}</span></div>`;
-    const evs=upcomingEvents().filter(e=>e._te===date && (act.includes(e.Source_Outlet)||act.includes(e.Unit)));
+    const evs=upcomingEvents().filter(e=>e._te===date && ([...new Set(act.map(fcKey))].includes(e.Source_Outlet)||[...new Set(act.map(fcKey))].includes(e.Unit)));
     if(evs.length){ html+='<div style="margin-top:10px;font-size:12px;color:var(--muted)">Rincian event:</div>';
       evs.forEach(e=>{ const cls=statusClass(e.Status);
         html+=`<div class="ev"><div class="ev-name">${e.Nama_Event}</div>`+
