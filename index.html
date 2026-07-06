@@ -47,9 +47,15 @@
   .kpi.accent .k-label{color:rgba(0,0,0,.55)}
   .who{font-size:12px;color:var(--muted)}
   .who button{margin-left:8px;background:none;border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--ink)}
-  .filterbar{display:flex;gap:12px;align-items:center;padding:10px 20px;background:#F2F1EF;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .filterbar select{padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:13px}
-  .filterbar label{font-size:12px;font-weight:600;color:var(--muted)}
+  .filterbar{display:flex;gap:14px;align-items:center;padding:12px 20px;background:#F2F1EF;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  /* ==== kontrol filter seragam (Revenue + COGS) ==== */
+  .filterbar select,.cogs-filter select,.cogs-filter .udbtn,.cogs-filter input[type=date],.cogs-filter input[type=number]{
+    height:34px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#fff;
+    font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;box-sizing:border-box}
+  .filterbar select:focus,.cogs-filter select:focus,.cogs-filter input:focus,.cogs-filter .udbtn:focus{outline:2px solid var(--navy);outline-offset:1px}
+  .filterbar label,.cogs-filter label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .fgroup{display:inline-flex;align-items:center;gap:7px}
+  .cogs-filter .fsep{width:1px;height:24px;background:var(--line);display:inline-block}
 
   /* ===== LAYOUT ===== */
   main{max-width:1200px;margin:0 auto;padding:20px}
@@ -133,6 +139,7 @@
   .popup-head h3{font-size:14px}
   .popup-head .sub{font-size:12px;color:var(--muted);font-weight:400}
   .popup-head button{background:none;border:none;font-size:20px;color:var(--muted)}
+  .popup-head #puCopy{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--navy);margin-right:6px}
   .popup-body{padding:14px 16px}
   .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px}
   .kv span:first-child{flex:1 1 auto;min-width:0}
@@ -154,6 +161,125 @@
     .kpi{flex:1;min-width:0}
     th,td{padding:7px 6px;font-size:12px}
   }
+
+  /* ===== SIDEBAR LAYOUT (Langkah A) ===== */
+  #app{display:flex;min-height:100vh}
+  #sidebar{width:210px;flex:0 0 210px;background:#16233F;color:#DfE4EC;display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;z-index:35}
+  #sidebar .sb-brand{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+  #sidebar .sb-brand b{font-size:14px;color:#fff;display:block}
+  #sidebar .sb-brand small{font-size:11px;color:#9AA9C4}
+  #sidebar nav{padding:10px 8px;flex:1}
+  .nav-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;
+    color:#C7D0E0;padding:11px 12px;border-radius:8px;font-size:14px;font-weight:600;margin-bottom:4px}
+  .nav-item:hover{background:rgba(255,255,255,.06)}
+  .nav-item.active{background:var(--navy);color:#fff}
+  .nav-item .dot{width:8px;height:8px;border-radius:50%;background:#C9A227;flex:0 0 8px}
+  .sb-foot{padding:12px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#9AA9C4}
+  .sb-foot button{width:100%;margin-top:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+    color:#fff;border-radius:7px;padding:8px;font-size:12px}
+  .sb-foot #refreshBtn{background:var(--navy);border-color:var(--navy);margin-top:0;margin-bottom:6px}
+  #content{flex:1;min-width:0;display:flex;flex-direction:column}
+  /* topbar hanya tampil di mobile untuk hamburger */
+  #topbar{display:none;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:34}
+  #hamb{background:none;border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:16px}
+  #backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:34}
+  .group{display:none}
+  .group.active{display:block}
+  /* header revenue tidak lagi sticky-full; biarkan mengalir dalam content */
+  #grp-revenue header{position:sticky;top:0}
+  /* Cost stub */
+  .stub{max-width:1200px;margin:40px auto;padding:40px;text-align:center;color:var(--muted);
+    background:var(--panel);border:1px dashed var(--line);border-radius:var(--radius)}
+  .stub b{color:var(--ink);font-size:15px}
+  /* angka bisa diklik-copy */
+  .num{cursor:pointer;border-bottom:1px dotted transparent}
+  .num:hover{border-bottom-color:currentColor}
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:#16233F;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:60;
+    opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:820px){
+    #sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.3)}
+    #sidebar.open{transform:translateX(0)}
+    #backdrop.show{display:block}
+    #topbar{display:flex}
+    #app{display:block}
+  }
+
+  /* ===== COGS (Langkah B) ===== */
+  .cogs-wrap{max-width:1200px;margin:0 auto;padding:18px}
+  .cogs-filter{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#F2F1EF;
+    border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px}
+  .cogs-filter input[type=range]{width:130px;cursor:pointer}
+  .cogs-filter .forecast-field{display:inline-flex;align-items:center;height:34px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .cogs-filter .forecast-field input[type=number]{height:100%;width:48px;border:none;border-radius:0;text-align:center;font-weight:700;padding:0}
+  .cogs-filter .forecast-field .unit{padding:0 9px;height:100%;display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--muted);background:#F2F1EF;border-left:1px solid var(--line)}
+  #cogsTgtVal{font-weight:700;color:var(--navy);min-width:40px;display:inline-block}
+  .cogs-banner{border-radius:var(--radius);padding:11px 16px;margin-bottom:14px;font-size:13px;line-height:1.5}
+  .cogs-banner.warn{background:#FBF3DE;border:1px solid #E7D08A;color:#7A5B12}
+  .rel-dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+  .rel-RELIABLE{background:var(--ok)} .rel-INDICATIVE{background:#D9A400} .rel-INCOMPLETE{background:var(--none)}
+  .cogs-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums}
+  .cp-green{background:#D9ECDE;color:#276B43} .cp-yellow{background:#F6EFC0;color:#7A6A12}
+  .cp-orange{background:#F7E0C2;color:#8A5418} .cp-red{background:#F2D2D2;color:#8C2F2F} .cp-none{background:#EEE;color:#777}
+  .cad-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .cad-chip{border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12px}
+  .cad-chip b{display:block;font-size:16px;color:var(--navy)}
+  .over-item{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+
+  .unitbox{display:inline-flex;flex-wrap:wrap;gap:2px 8px;max-width:520px}
+  .uchk{font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap}
+  .uchk input,.ckchk input{vertical-align:middle;margin-right:2px}
+  .ckchk{font-size:12px;color:var(--muted)}
+  .cogs-total{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .ct-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;min-width:150px}
+  .ct-card .ct-lab{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+  .ct-card b{font-size:18px;color:var(--navy)}
+  .pctcell{cursor:pointer}
+  #cogsTable th[data-sort]{cursor:pointer;user-select:none}
+  #cogsTable th[data-sort]:hover{color:var(--navy)}
+  #dmlTable th[data-sort]{cursor:pointer;user-select:none}
+  #dmlTable th[data-sort]:hover{color:var(--navy)}
+
+  .uddrop{position:relative;display:inline-block}
+  .udbtn{padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);font-size:13px;font-weight:600;cursor:pointer}
+  .unitpanel{display:none;position:absolute;top:110%;left:0;z-index:40;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:8px;max-height:240px;overflow:auto;min-width:150px}
+  .unitpanel.open{display:block}
+  .unitpanel .uchk{display:block;font-size:12px;font-weight:600;padding:3px 4px;white-space:nowrap}
+  .daytag{font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px;font-weight:700}
+  .daytag.actual{background:#D9ECDE;color:#276B43} .daytag.forecast{background:#EDE3C8;color:#8A6D1B}
+  .cogs-loading{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:10px 0}
+  .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--navy);border-radius:50%;display:inline-block;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .infodot{cursor:help;color:var(--muted);font-weight:700}
+
+  .daytbl{width:100%;border-collapse:collapse;font-size:13px}
+  .daytbl th{text-align:left;color:var(--muted);font-size:11px;font-weight:700;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .daytbl td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left}
+  .daytbl .rt{text-align:right;font-variant-numeric:tabular-nums}
+  .daytbl tr.subrow td{color:var(--muted);font-size:12px;border-bottom:1px dotted var(--line)}
+  .daytbl tr.subrow td.sup{padding-left:24px;font-weight:600}
+  .rmk{font-size:10px;padding:1px 5px;border-radius:8px;margin-left:6px;font-weight:700}
+  .rmk.min{background:#D9ECDE;color:#276B43} .rmk.up{background:#F2D2D2;color:#8C2F2F}
+
+  .cogs-header{position:sticky;top:0;z-index:30;background:var(--bg);padding:10px 0 4px}
+  .grp-title{font-size:20px;font-weight:800;color:var(--ink);margin:0 0 10px}
+  .chips{display:inline-flex;gap:6px;flex-wrap:wrap}
+  .chip,.tmode{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink)}
+  .chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .tmode.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .topctrl{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .topctrl select{height:32px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer}
+  .topctrl .topn{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;display:inline-flex;align-items:center;gap:6px}
+  .topctrl .topn input{width:48px;height:32px;border:1px solid var(--line);border-radius:8px;text-align:center;font-weight:700;font-size:13px;color:var(--ink)}
+  .dml-ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .dml-ctrl select,.dml-search{padding:5px 8px;border:1px solid var(--line);border-radius:7px;font-size:12px}
+  .dml-search{min-width:160px}
+  .unitpanel .uctrl{display:flex;gap:6px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .unitpanel .uctrl button{flex:1;font-size:11px;padding:3px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;font-weight:600;color:var(--ink)}
 </style>
 </head>
 <body>
@@ -172,9 +298,27 @@
 
 <!-- ======== APP ======== -->
 <div id="app" class="hidden">
+  <aside id="sidebar">
+    <div class="sb-brand"><b>Plataran Finance</b><small>Monitoring</small></div>
+    <nav>
+      <button class="nav-item active" data-grp="revenue"><span class="dot" style="background:#4C7BE0"></span> Revenue</button>
+      <button class="nav-item" data-grp="cost"><span class="dot" style="background:#C9A227"></span> COGS</button>
+    </nav>
+    <div class="sb-foot">
+      <button id="refreshBtn">↻ Refresh Data</button>
+      Masuk sebagai <b id="whoName2">—</b><br><span id="whoRole2">—</span>
+      <button id="logoutBtn2">Keluar</button>
+    </div>
+  </aside>
+  <div id="backdrop"></div>
+  <div id="content">
+    <div id="topbar"><button id="hamb">☰</button><b style="font-size:14px" id="topTitle">Revenue</b></div>
+
+    <!-- ======== GRUP REVENUE ======== -->
+    <div class="group active" id="grp-revenue">
   <header>
     <div class="hbar">
-      <div class="brand">Finance Monitoring Dashboard<small id="periodLabel">—</small></div>
+      <div class="brand">Revenue Monitoring<small id="periodLabel">—</small></div>
       <div class="kpis">
         <div class="kpi"><div class="k-label">Revenue MTD</div><div class="k-val" id="kpiMTD">—</div></div>
         <div class="kpi"><div class="k-label">Forecast Akhir Bulan</div><div class="k-val" id="kpiProj">—</div></div>
@@ -183,12 +327,8 @@
       </div>
     </div>
     <div class="filterbar">
-      <label>Cluster</label>
-      <select id="fCluster"><option value="ALL">Semua</option></select>
-      <label>Outlet</label>
-      <select id="fOutlet"><option value="ALL">Semua</option></select>
-      <span class="who" style="margin-left:auto">Masuk sebagai <b id="whoName">—</b> (<span id="whoRole">—</span>)
-        <button id="logoutBtn">Keluar</button></span>
+      <div class="fgroup"><label>Cluster</label><select id="fCluster"><option value="ALL">Semua</option></select></div>
+      <div class="fgroup"><label>Outlet</label><select id="fOutlet"><option value="ALL">Semua</option></select></div>
     </div>
   </header>
 
@@ -270,6 +410,85 @@
       </div>
     </section>
   </main>
+    </div>
+
+    <!-- ======== GRUP COST (stub Langkah A) ======== -->
+    <div class="group" id="grp-cost">
+      <div class="cogs-wrap">
+        <div class="cogs-header"><h1 class="grp-title">COGS Monitoring</h1>
+        <div class="cogs-filter">
+          <div class="fgroup"><label>Cluster</label><select id="cogsCluster"><option value="">Semua</option></select></div>
+          <div class="fgroup"><label>Unit</label><div class="uddrop"><button type="button" id="cogsUnitBtn" class="udbtn">Unit: semua ▾</button><div id="cogsUnitBox" class="unitpanel"></div></div></div>
+          <span class="fsep"></span>
+          <div class="fgroup"><label>Dari</label><input type="date" id="cogsFrom"></div>
+          <div class="fgroup"><label>s/d</label><input type="date" id="cogsTo"></div>
+          <div class="fgroup"><label>Forecast</label><span class="forecast-field"><input type="number" id="cogsFwd" min="0" max="120" value="0" title="Maks 120 hari"><span class="unit">+hari</span></span></div>
+          <span class="fsep"></span>
+          <div class="fgroup"><label>Target</label><input type="range" id="cogsTgt" min="10" max="40" step="1" value="20"><span id="cogsTgtVal">20%</span></div>
+          <label class="ckchk"><input type="checkbox" id="cogsInclCK"> sertakan CK</label>
+        </div>
+        </div>
+        <div id="cogsLoading" class="cogs-loading hidden"><span class="spin"></span> Memuat data COGS…</div>
+        <div id="cogsWarn"></div>
+        <div id="cogsBanner"></div>
+        <div id="cogsTotal" class="cogs-total"></div>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">COGS #1</div><h2>Total COGS per Unit</h2></div>
+            <span class="muted" style="font-size:12px">Kitchen · Bar · Event</span></div>
+          <div class="sec-body"><div class="chart-wrap" style="height:340px"><canvas id="cogsChart"></canvas></div></div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">COGS #2 & #4</div><h2>COGS per Unit & Rasio</h2></div>
+            <span class="muted" style="font-size:12px">Klik % utk rincian · titik = keandalan</span></div>
+          <div class="sec-body" style="overflow-x:auto"><table id="cogsTable">
+            <thead><tr>
+              <th data-sort="unit">Unit</th><th data-sort="K">Kitchen</th><th data-sort="B">Bar</th>
+              <th data-sort="E">Event</th><th data-sort="tot">Total</th><th data-sort="revTot">Revenue</th><th data-sort="pct">Rasio%</th>
+            </tr></thead><tbody id="cogsBody"></tbody></table></div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">COGS #3</div><h2>Detail DML</h2></div>
+            <button id="dmlLoad" class="udbtn">Muat / perbarui detail</button></div>
+          <div class="sec-body">
+            <div id="dmlLoading" class="cogs-loading hidden"><span class="spin"></span> Memuat detail…</div>
+            <div id="dmlHint" class="muted" style="font-size:12px">Klik "Muat detail" untuk menarik item sesuai filter periode & unit di atas.</div>
+            <div id="dmlControls" class="dml-ctrl hidden">
+			<div class="chips">
+                <button class="chip" data-f="spike">Spike</button>
+                <button class="chip" data-f="baru">Item baru</button>
+                <button class="chip" data-f="rutin">Order rutin ≤</button>
+                <input id="dmlNhari" type="number" min="1" value="3" style="width:44px"> <span class="muted" style="font-size:11px">hari</span>
+              </div>
+              <select id="dmlBucket"><option value="ALL">Semua dept</option><option>KITCHEN</option><option>BAR</option><option>EVENT</option></select>
+              <select id="dmlKategori"><option value="ALL">Semua kategori</option></select>
+              <input id="dmlSearch" placeholder="cari item…" class="dml-search">
+              <button id="dmlCopy" class="udbtn">Salin</button>
+              <span id="dmlCount" class="muted"></span>
+            </div>
+            <div style="overflow-x:auto"><table id="dmlTable" class="daytbl hidden">
+              <thead><tr><th>Tanggal</th><th>Unit</th><th>Dept</th><th>Item</th><th>Kategori</th><th class="rt">Qty</th><th class="rt">Amount</th><th>Order terakhir</th><th>Flag</th></tr></thead>
+              <tbody id="dmlBody"></tbody><tfoot id="dmlFoot"></tfoot></table></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">COGS #5</div><h2>Top Purchase</h2></div>
+            <div class="topctrl">
+              <select id="topSupplier"><option value="ALL">Semua supplier</option></select>
+              <select id="topKat"><option value="ALL">Semua kategori</option></select>
+              <label class="topn">Top <input type="number" id="topN" min="1" max="100" value="10"></label>
+            </div></div>
+          <div class="sec-body"><div style="overflow-x:auto"><table id="topTable" class="daytbl">
+            <thead><tr><th>#</th><th>Item</th><th>Kategori</th><th>Supplier</th><th class="rt">Harga terakhir</th><th class="rt">Qty</th><th class="rt">Amount</th></tr></thead>
+            <tbody id="topBody"></tbody></table></div></div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">COGS #3</div><h2>Perlu Perhatian — Overdue</h2></div>
+            <span class="muted" style="font-size:12px">Keyakinan TINGGI, unit terpilih</span></div>
+          <div class="sec-body"><div id="overBody"></div></div>
+        </section>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ======== POPUP ======== -->
@@ -277,7 +496,7 @@
   <div class="popup">
     <div class="popup-head">
       <div><h3 id="puTitle">—</h3><div class="sub" id="puSub">—</div></div>
-      <button id="puClose">&times;</button>
+      <button id="puCopy" title="Salin semua ke clipboard (TSV, rapi utk Excel)">Salin</button><button id="puClose">&times;</button>
     </div>
     <div class="popup-body" id="puBody"></div>
   </div>
@@ -353,10 +572,32 @@ function fmt(n){
   return n.toLocaleString("id-ID");
 }
 function pct(n){ return (n==null||!isFinite(n))?"—":(n*100).toFixed(0)+"%"; }
+/* ===== FORMAT UANG: tampilan ringkas (Bio/Mio), klik -> salin integer bersih ===== */
+function fmtFull(n){ return (n==null||isNaN(n))?"\u2014":Math.round(n).toLocaleString("en-US"); } // 4,819,663,476 utk dibaca
+function money(n){ // tabel depan: ringkas Bio/Mio; klik tetap salin integer penuh (data-raw)
+  if(n==null||isNaN(n)) return '<span>\u2014</span>';
+  return '<span class="num" data-raw="'+Math.round(n)+'">'+fmt(n)+'</span>';
+}
+function moneyFull(n){ // popup: nilai penuh tanpa desimal (mudah blok/salin)
+  if(n==null||isNaN(n)) return '<span>\u2014</span>';
+  return '<span class="num" data-raw="'+Math.round(n)+'">'+fmtFull(n)+'</span>';
+}
+let _toastT=null;
+function toast(msg){ let t=document.getElementById("toast"); if(!t){t=document.createElement("div");t.id="toast";document.body.appendChild(t);}
+  t.textContent=msg; t.classList.add("show"); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove("show"),1600); }
+function copyRaw(raw){ // salin INTEGER BERSIH (tanpa pemisah) -> aman paste ke Excel locale apa pun
+  const clean=String(raw);
+  const done=()=>toast("Tersalin: "+Number(clean).toLocaleString("en-US"));
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(clean).then(done).catch(()=>fallbackCopy(clean,done)); }
+  else fallbackCopy(clean,done);
+}
+function fallbackCopy(txt,cb){ const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select(); try{document.execCommand("copy");}catch(e){} document.body.removeChild(ta); cb&&cb(); }
+document.addEventListener("click",e=>{ const el=e.target.closest(".num[data-raw]"); if(el){ e.stopPropagation(); copyRaw(el.dataset.raw); } });
 
 /* ===== Rows->objects pakai headers ===== */
 function rowsToObjs(headers,rows){
-  return rows.map(r=>{const o={};headers.forEach((h,i)=>o[String(h).trim()]=r[i]);return o;});
+  return rows.filter(r=>r.some(c=>c!==""&&c!=null)).map(r=>{const o={};headers.forEach((h,i)=>o[String(h).trim()]=r[i]);return o;});
 }
 
 /* =========================================================
@@ -377,16 +618,11 @@ async function doLogin(){
     if(!r.ok){ $("loginErr").textContent=r.error||"PIN salah."; return; }
     STATE.token=r.token; STATE.role=r.role; STATE.allowed=r.allowed; STATE.name=r.nama;
     $("login").classList.add("hidden"); $("app").classList.remove("hidden");
-    $("whoName").textContent=r.nama; $("whoRole").textContent=r.role;
+    $("whoName2").textContent=r.nama; $("whoRole2").textContent=r.role;
     await boot();
   }catch(e){ $("loginErr").textContent="Gagal terhubung: "+e.message; }
   finally{ $("loginBtn").disabled=false; $("loginBtn").textContent="Masuk"; }
 }
-
-$("logoutBtn").onclick=async()=>{
-  try{ await api({action:"logout",token:STATE.token}); }catch(e){}
-  location.reload();
-};
 
 /* ===== ambil 1 tab, return objects (atau null kalau tak boleh/akses) ===== */
 async function getTab(tab){
@@ -616,14 +852,13 @@ function computeSectionC(){
 /* =========================================================
    RENDER
    ========================================================= */
+function setKpi(id,val){ const el=$(id); el.textContent=fmt(val); el.dataset.raw=Math.round(val||0); el.classList.add("num"); }
 function renderKPI(){
   const rows=STATE.rowsC;
   const mtd=rows.reduce((s,r)=>s+(r.mtd||0),0);
   const proj=rows.reduce((s,r)=>s+(r.proj||0),0);
   const bud=rows.reduce((s,r)=>s+(r.budget||0),0);
-  $("kpiMTD").textContent=fmt(mtd);
-  $("kpiProj").textContent=fmt(proj);
-  $("kpiBudget").textContent=fmt(bud);
+  setKpi("kpiMTD",mtd); setKpi("kpiProj",proj); setKpi("kpiBudget",bud);
   const ratio = bud>0? proj/bud : null;
   $("kpiAch").textContent= ratio!=null? pct(ratio):"—";
   const band=achBand(ratio);
@@ -653,8 +888,8 @@ function renderTableC(){
     const isGrp = !!r._group, splitBud = isGrp && hasSplitBudget(r._group);
     const budCell = (r.budget==null)? `<td class="col-budget">—</td>`
       : splitBud
-        ? `<td class="clickable col-budget" data-act="budget" data-o="${r.outlet}">${fmt(r.budget)}</td>`
-        : `<td class="col-budget">${fmt(r.budget)}</td>`;
+        ? `<td class="clickable col-budget" data-act="budget" data-o="${r.outlet}">${money(r.budget)}</td>`
+        : `<td class="col-budget">${money(r.budget)}</td>`;
     const projFlag = r.flag || "none";
     const projTitle = r.flag ? flagLabelText(r.flag) : "Tanpa flag forecast";
     const days=Number((STATE.lastActualDate||"").slice(8,10))||1;
@@ -662,10 +897,10 @@ function renderTableC(){
     tr.innerHTML=
       `<td><span class="outlet-name">${r._group?displayName(r.outlet):r.outlet}</span>`+
         `<span class="outlet-sub">${r.unit||r.cluster||"—"}</span></td>`+
-      `<td class="clickable col-mtd" data-act="mtd" data-o="${r.outlet}">${fmt(r.mtd)}`+
-        `<span class="mtd-sub">${fmt(avgDay)}/hari</span></td>`+
+      `<td class="clickable col-mtd" data-act="mtd" data-o="${r.outlet}">${money(r.mtd)}`+
+        `<span class="mtd-sub">${money(avgDay)}/hari</span></td>`+
       `<td class="clickable" data-act="proj" data-o="${r.outlet}" title="${projTitle}">`+
-        `<span class="proj-pill proj-pill-${projFlag}">${fmt(r.proj)}</span></td>`+
+        `<span class="proj-pill proj-pill-${projFlag}">${money(r.proj)}</span></td>`+
       budCell+
       `<td><span class="ach-pill ${achCls}">${ach}</span></td>`;
     tb.appendChild(tr);
@@ -694,7 +929,7 @@ function renderTableD(){
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${e._te}</td><td>${e.Source_Outlet||e.Unit}</td>`+
       `<td style="white-space:normal;text-align:left">${e.Nama_Event||"—"}</td>`+
-      `<td>${e.Pax||"—"}</td><td>${fmt(Number(e.Nilai_Event)||0)}</td>`+
+      `<td>${e.Pax||"—"}</td><td>${money(Number(e.Nilai_Event)||0)}</td>`+
       `<td><span class="pill ${cls}" title="${e.Status}">${cls}</span></td>`;
     tb.appendChild(tr);
   });
@@ -867,6 +1102,23 @@ function getCSS(v){return getComputedStyle(document.documentElement).getProperty
    ========================================================= */
 function openOverlay(title,sub){ $("puTitle").textContent=title; $("puSub").textContent=sub||"";
   $("overlay").classList.remove("hidden"); }
+/* Salin isi popup sebagai TSV: tiap baris (.day-row/.kv yg punya .num) -> "label<TAB>angka_bersih". */
+function copyPopupTSV(){
+  const body=$("puBody"); const lines=[];
+  const rowsSel=body.querySelectorAll(".daytbl tbody tr, .day-row, .kv");
+  rowsSel.forEach(row=>{
+    const nums=[...row.querySelectorAll(".num[data-raw]")]; if(!nums.length) return;
+    let label="";
+    if(row.tagName==="TR"){ const td0=row.querySelector("td"); if(td0&&!td0.querySelector(".num")) label=td0.textContent.trim(); }
+    else { const first=row.querySelector(".d, span"); if(first&&!first.classList.contains("num")) label=first.textContent.trim(); }
+    lines.push((label?label+"\t":"")+nums.map(n=>n.dataset.raw).join("\t"));
+  });
+  if(!lines.length){ toast("Tak ada angka utk disalin"); return; }
+  const tsv=lines.join("\n"); const done=()=>toast(lines.length+" baris tersalin");
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(tsv).then(done).catch(()=>fallbackCopy(tsv,done)); }
+  else fallbackCopy(tsv,done);
+}
+$("puCopy").onclick=copyPopupTSV;
 $("puClose").onclick=()=>$("overlay").classList.add("hidden");
 $("overlay").onclick=e=>{ if(e.target.id==="overlay") $("overlay").classList.add("hidden"); };
 
@@ -884,9 +1136,9 @@ function openCellPopup(act,outlet){
     const dates=Object.keys(byDate).sort();
     if(!dates.length){ body.innerHTML='<div class="muted">Belum ada data.</div>'; return; }
     dates.forEach(d=>{ body.insertAdjacentHTML("beforeend",
-      `<div class="day-row"><span class="d">${d}</span><span>${fmt(byDate[d])}</span></div>`); });
+      `<div class="day-row"><span class="d">${d}</span><span>${moneyFull(byDate[d])}</span></div>`); });
     body.insertAdjacentHTML("beforeend",
-      `<div class="kv" style="margin-top:8px"><span>Total MTD</span><span class="v">${fmt(dates.reduce((s,d)=>s+byDate[d],0))}</span></div>`);
+      `<div class="kv" style="margin-top:8px"><span>Total MTD</span><span class="v">${moneyFull(dates.reduce((s,d)=>s+byDate[d],0))}</span></div>`);
   } else {
     openOverlay(displayName(outlet)+" — Forecast sisa bulan","Forecast harian, "+STATE.currentMonth);
     const parts = MERGE_GROUPS[outlet]||[outlet];
@@ -901,12 +1153,12 @@ function openCellPopup(act,outlet){
       const evList = eventsForDate(parts,x.date);
       let html=`<div class="ev"><div class="ev-top"><span class="ev-name">${x.date}</span>`+
         `<span class="badge b-${x.flag} " style="font-size:10px">${flagLabelText(x.flag)}</span></div>`+
-        `<div class="kv"><span>Reguler (FB)</span><span class="v">${fmt(x.fbReg)}</span></div>`+
-        `<div class="kv"><span>Event</span><span class="v">${fmt(x.event)}</span></div>`;
+        `<div class="kv"><span>Reguler (FB)</span><span class="v">${moneyFull(x.fbReg)}</span></div>`+
+        `<div class="kv"><span>Event</span><span class="v">${moneyFull(x.event)}</span></div>`;
       evList.forEach(e=>{ const cls=statusClass(e.Status);
         html+=`<div class="kv"><span>· ${e.Nama_Event} <span class="pill ${cls}" title="${e.Status}">${cls}</span></span>`+
-              `<span class="v">${fmt(Number(e.Nilai_Event)||0)}</span></div>`; });
-      html+=`<div class="kv"><span><b>Total Revenue</b></span><span class="v">${fmt(x.total)}</span></div></div>`;
+              `<span class="v">${moneyFull(Number(e.Nilai_Event)||0)}</span></div>`; });
+      html+=`<div class="kv"><span><b>Total Revenue</b></span><span class="v">${moneyFull(x.total)}</span></div></div>`;
       body.insertAdjacentHTML("beforeend",html);
     });
   }
@@ -931,11 +1183,11 @@ function openBudgetPopup(groupKey){
     const fk=fcKey(o); const fr = fcSeen.has(fk)? 0 : (fcSeen.add(fk), fcr[fk]||0);
     const mt=mtd[o]||0, bud=budgetFor(outletToBudgetKey(o),STATE.currentMonth);
     tM+=mt; tF+=fr; tB+=(bud||0);
-    html+=`<tr><td>${o}</td><td class="right">${fmt(mt)}</td>`+
-      `<td class="right">${fmt(fr)}</td><td class="right">${bud==null?"—":fmt(bud)}</td></tr>`;
+    html+=`<tr><td>${o}</td><td class="right">${moneyFull(mt)}</td>`+
+      `<td class="right">${moneyFull(fr)}</td><td class="right">${bud==null?"—":moneyFull(bud)}</td></tr>`;
   });
-  html+=`<tr style="font-weight:600"><td>Total</td><td class="right">${fmt(tM)}</td>`+
-    `<td class="right">${fmt(tF)}</td><td class="right">${fmt(tB)}</td></tr>`;
+  html+=`<tr style="font-weight:600"><td>Total</td><td class="right">${moneyFull(tM)}</td>`+
+    `<td class="right">${moneyFull(tF)}</td><td class="right">${moneyFull(tB)}</td></tr>`;
   html+='</tbody></table>';
   body.innerHTML=html;
 }
@@ -953,24 +1205,24 @@ function openDayPopup(date){
       evt+=Number(r.Event)||0; tot+=Number(r.Total_Revenue)||0; }});
     const reguler = tot - evt;
     body.innerHTML=
-      `<div class="kv"><span>Reguler</span><span class="v">${fmt(reguler)}</span></div>`+
-      `<div class="kv"><span>Event</span><span class="v">${fmt(evt)}</span></div>`+
-      `<div class="kv"><span><b>Total Revenue</b></span><span class="v">${fmt(tot)}</span></div>`;
+      `<div class="kv"><span>Reguler</span><span class="v">${moneyFull(reguler)}</span></div>`+
+      `<div class="kv"><span>Event</span><span class="v">${moneyFull(evt)}</span></div>`+
+      `<div class="kv"><span><b>Total Revenue</b></span><span class="v">${moneyFull(tot)}</span></div>`;
   } else {
     openOverlay("Forecast "+date,"Forecast + rincian event");
     let fbReg=0,evt=0,tot=0;
     [...new Set(act.map(fcKey))].forEach(o=>forecastDailyForOutlet(o).forEach(x=>{ if(x.date===date){
       fbReg+=x.fbReg; evt+=x.event; tot+=x.total; }}));
-    let html=`<div class="kv"><span>Reguler (FB)</span><span class="v">${fmt(fbReg)}</span></div>`+
-      `<div class="kv"><span>Event (forecast)</span><span class="v">${fmt(evt)}</span></div>`+
-      `<div class="kv"><span><b>Total Forecast</b></span><span class="v">${fmt(tot)}</span></div>`;
+    let html=`<div class="kv"><span>Reguler (FB)</span><span class="v">${moneyFull(fbReg)}</span></div>`+
+      `<div class="kv"><span>Event (forecast)</span><span class="v">${moneyFull(evt)}</span></div>`+
+      `<div class="kv"><span><b>Total Forecast</b></span><span class="v">${moneyFull(tot)}</span></div>`;
     const evs=upcomingEvents().filter(e=>e._te===date && ([...new Set(act.map(fcKey))].includes(e.Source_Outlet)||[...new Set(act.map(fcKey))].includes(e.Unit)));
     if(evs.length){ html+='<div style="margin-top:10px;font-size:12px;color:var(--muted)">Rincian event:</div>';
       evs.forEach(e=>{ const cls=statusClass(e.Status);
         html+=`<div class="ev"><div class="ev-name">${e.Nama_Event}</div>`+
           `<div class="ev-top"><span>${e.Source_Outlet||e.Unit} · ${e.Pax||"—"} pax</span>`+
           `<span class="pill ${cls}" title="${e.Status}">${cls}</span></div>`+
-          `<div class="kv"><span>Nilai</span><span class="v">${fmt(Number(e.Nilai_Event)||0)}</span></div></div>`; });
+          `<div class="kv"><span>Nilai</span><span class="v">${moneyFull(Number(e.Nilai_Event)||0)}</span></div></div>`; });
     }
     body.innerHTML=html;
   }
@@ -1002,6 +1254,327 @@ document.querySelectorAll('#tableC thead th[data-sort]').forEach(th=>{
 /* ===== util ===== */
 function showErr(msg){ const a=$("errArea");
   a.innerHTML = msg? `<div class="err-banner">${msg}</div>` : ""; }
+
+/* ===== SIDEBAR NAV / GROUP SWITCH (Langkah A) ===== */
+const GROUPS=["revenue","cost"];
+const GRP_LOADED={revenue:false,cost:false};
+function showGroup(name){
+  GROUPS.forEach(g=>{ $("grp-"+g).classList.toggle("active", g===name); });
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.grp===name));
+  $("topTitle").textContent = name==="cost" ? "COGS" : "Revenue";
+  closeSidebar();
+  if(name==="cost") ensureCostData();      // lazy-fetch DML (diisi di Langkah B)
+  if(name==="revenue") resizeRevenueCharts();
+}
+function resizeRevenueCharts(){ // Chart.js bisa gepeng kalau sempat ter-hidden -> paksa resize
+  try{ if(STATE.charts.daily) STATE.charts.daily.resize(); }catch(e){}
+  (STATE.charts.sm||[]).forEach(c=>{try{c.resize();}catch(e){}});
+}
+const LEAD_TIME_MIN=4; // rentang < ini -> warning bias lead-time belanja
+function cogsUnitsAll(){ return [...new Set((STATE.data.DML_Cost_Daily||[]).map(r=>String(r.Unit||"").trim()).filter(Boolean))]; }
+function dayList(from,to){ const out=[]; let d=new Date(from+"T00:00:00Z"),e=new Date(to+"T00:00:00Z");
+  while(d<=e){ out.push(d.toISOString().slice(0,10)); d.setUTCDate(d.getUTCDate()+1);} return out; }
+function rangeDays(from,to){ if(!from||!to)return 0; return Math.round((new Date(to)-new Date(from))/86400000)+1; }
+function lastFullMonth(){ const la=STATE.lastActualDate||""; if(!la)return null;
+  const d=new Date(la+"T00:00:00Z"); d.setUTCDate(1); d.setUTCDate(0); // hari terakhir bulan sebelumnya
+  const y=d.getUTCFullYear(),m=d.getUTCMonth()+1; return {from:`${y}-${String(m).padStart(2,"0")}-01`, to:d.toISOString().slice(0,10)}; }
+
+// revenue per unit: per hari actual bila ada, else forecast (snapshot terbaru). Jumlah atas [from,to].
+function revDaysForUnit(unit,from,to){
+  const rev=STATE.data.Revenue_Master||[], fc=STATE.data.Forecast_Output||[];
+  const act={}; let lastAct="";
+  rev.forEach(r=>{ if(String(r.Unit||"").trim()!==unit)return; const t=dstr(r.Tanggal); if(t<from||t>to)return;
+    (act[t]=act[t]||{food:0,bev:0,event:0}); act[t].food+=Number(r.Food)||0; act[t].bev+=Number(r.Beverage)||0; act[t].event+=Number(r.Event)||0;
+    if(t>lastAct)lastAct=t; });
+  const best={};
+  fc.forEach(r=>{ if(String(r.Unit||"").trim()!==unit)return; const td=dstr(r.Target_Date); if(td<from||td>to)return;
+    const k=(r.Outlet||"")+"|"+td, sd=dstr(r.Snapshot_Date); if(!best[k]||sd>best[k]._sd) best[k]={...r,_sd:sd}; });
+  const fcDay={}; Object.values(best).forEach(r=>{ const td=dstr(r.Target_Date);
+    (fcDay[td]=fcDay[td]||{food:0,bev:0,event:0}); fcDay[td].food+=Number(r.Food_Reg)||0; fcDay[td].bev+=Number(r.Bev_Reg)||0; fcDay[td].event+=Number(r.Event)||0; });
+  let food=0,bev=0,event=0,nAct=0,nFc=0; const days=[];
+  dayList(from,to).forEach(D=>{
+    let src=null,isFc;
+    if(lastAct && D<=lastAct){ src=act[D]||{food:0,bev:0,event:0}; isFc=false; nAct++; }   // batas per-unit: <=batas selalu actual (kosong=0)
+    else { src=fcDay[D]||null; isFc=true; if(src)nFc++; }                                    // >batas: forecast bila ada
+    if(!src) return;
+    food+=src.food; bev+=src.bev; event+=src.event;
+    days.push({date:D, rev:src.food+src.bev+src.event, src:isFc?"forecast":"actual"});
+  });
+  return {revFood:food+event, revBev:bev, revTot:food+bev+event, nAct, nFc, lastAct, days};
+}
+function addDays_(iso,n){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function cogsFwd(){ const n=parseInt($("cogsFwd")&&$("cogsFwd").value,10); return isFinite(n)&&n>0?Math.min(n,120):0; }
+function cogsRange(){ const from=$("cogsFrom").value||"0000"; let to=$("cogsTo").value||"9999";
+  const n=cogsFwd(); if(n>0 && to!=="9999") to=addDays_(to,n); return {from,to}; }
+function cogsSelectedUnits(){ const b=[...document.querySelectorAll("#cogsUnitBox input:checked")].map(x=>x.value); return b.length?b:cogsUnitsAll(); }
+function targetFor(unit){ if(STATE.cogsSlider!=null)return STATE.cogsSlider;
+  const d=(STATE.data.DIM_UNIT||[]).find(x=>String(x.Unit).trim()===unit); const t=d?Number(d.Target_Cost_Pct):NaN; return (isFinite(t)&&t>0)?t:0.20; }
+function costBand(p,target){ if(p==null)return"cp-none"; const r=p/target; if(r<=1)return"cp-green"; if(r<=1.15)return"cp-yellow"; if(r<=1.3)return"cp-orange"; return"cp-red"; }
+
+function cogsData(){
+  const cd=STATE.data.DML_Cost_Daily||[]; const {from,to}=cogsRange(); const sel=new Set(cogsSelectedUnits());
+  const U={}; let relAmt={RELIABLE:0,INDICATIVE:0,INCOMPLETE:0};
+  cd.forEach(r=>{ const u=String(r.Unit||"").trim(); if(!u||!sel.has(u))return; const t=dstr(r.Tanggal); if(t<from||t>to)return;
+    const b=String(r.Bucket||"").toUpperCase(); const amt=Number(r.Amount)||0; const rel=String(r.Reliability||"").toUpperCase();
+    if(!U[u])U[u]={unit:u,K:0,B:0,E:0,inc:0,ind:0};
+    if(b==="KITCHEN")U[u].K+=amt; else if(b==="BAR")U[u].B+=amt; else if(b==="EVENT")U[u].E+=amt;
+    if(rel==="INCOMPLETE")U[u].inc+=amt; else if(rel==="INDICATIVE")U[u].ind+=amt; relAmt[rel]=(relAmt[rel]||0)+amt; });
+  Object.values(U).forEach(u=>{ const rv=revDaysForUnit(u.unit,from,to);
+    u.cogsFood=u.K+u.E; u.cogsBev=u.B; u.tot=u.K+u.B+u.E;
+    u.revFood=rv.revFood; u.revBev=rv.revBev; u.revTot=rv.revTot; u.nAct=rv.nAct; u.nFc=rv.nFc;
+    u.pct=u.revTot>0?u.tot/u.revTot:null; u.pctFood=u.revFood>0?u.cogsFood/u.revFood:null; u.pctBev=u.revBev>0?u.cogsBev/u.revBev:null;
+    u.relDot=u.inc>0?"INCOMPLETE":(u.ind>0?"INDICATIVE":"RELIABLE"); });
+  return {U,relAmt,from,to};
+}
+function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderCogsTable(); renderOverdue(); }
+function renderCogsWarn(){ const {from,to}=cogsRange(); const days=rangeDays(from,to); const n=cogsFwd(); let msg="";
+  if(n>LEAD_TIME_MIN) msg="\u26a0 +"+n+" hari forecast melebihi lead-time belanja (~"+LEAD_TIME_MIN+" hari). Revenue hari-hari itu ditambahkan tanpa cost pasangannya \u2014 rasio bisa turun palsu.";
+  else if(days>0&&days<LEAD_TIME_MIN) msg="\u26a0 Periode terlalu pendek ("+days+" hari). Belanja hari ini sering untuk stok beberapa hari ke depan, jadi rasio bisa terlihat terlalu tinggi. Pilih minimal 1 minggu untuk angka yang wajar.";
+  $("cogsWarn").innerHTML = msg ? `<div class="cogs-banner warn">${msg}</div>` : ""; }
+function renderCogsBanner(){ const {relAmt}=cogsData(); const tot=(relAmt.RELIABLE||0)+(relAmt.INDICATIVE||0)+(relAmt.INCOMPLETE||0);
+  const ind=tot>0?Math.round((relAmt.INDICATIVE||0)/tot*100):0;
+  const tip="Sebagian nilai ("+ind+"%) masih estimasi dari catatan belanja (LOG), belum dicocokkan dengan order final. Angka bisa berubah setelah verifikasi.";
+  $("cogsBanner").innerHTML=`<div class="cogs-banner warn">COGS ini dari data belanja harian (DML) \u2014 belum termasuk pengambilan store & transfer antar unit. Sebagian nilai masih estimasi, belum dicek final. <span class="infodot" title="${tip}">\u24d8</span></div>`; }
+function renderCogsTotal(){ const {U}=cogsData(); const inclCK=$("cogsInclCK").checked;
+  let cogs=0,rev=0; Object.values(U).forEach(u=>{ if(u.unit==="CK"&&!inclCK)return; cogs+=u.tot; rev+=u.revTot; });
+  const ratio=rev>0?cogs/rev:null; const band=ratio==null?"cp-none":costBand(ratio, STATE.cogsSlider!=null?STATE.cogsSlider:0.20);
+  $("cogsTotal").innerHTML=`<div class="ct-card"><span class="ct-lab">Total COGS</span><b>${money(cogs)}</b></div>`+
+    `<div class="ct-card"><span class="ct-lab">Revenue (denominator)</span><b>${money(rev)}</b></div>`+
+    `<div class="ct-card"><span class="ct-lab">Rasio all-unit${inclCK?" (incl CK)":""}</span><span class="cogs-pill ${band}">${pct(ratio)}</span></div>`; }
+function renderCogsChart(){ const {U}=cogsData(); const rows=Object.values(U).sort((a,b)=>b.tot-a.tot); const ctx=$("cogsChart"); if(!ctx)return;
+  if(STATE.charts.cogs)STATE.charts.cogs.destroy();
+  STATE.charts.cogs=new Chart(ctx,{type:"bar",data:{labels:rows.map(r=>r.unit),datasets:[
+    {label:"Kitchen",data:rows.map(r=>r.K),backgroundColor:getCSS("--navy")},
+    {label:"Bar",data:rows.map(r=>r.B),backgroundColor:getCSS("--we")},
+    {label:"Event",data:rows.map(r=>r.E),backgroundColor:"#B0743A"}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},
+      tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.parsed.y)}}},
+      scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}}); }
+function renderCogsTable(){ const {U}=cogsData(); let rows=Object.values(U);
+  const sk=STATE.cogsSort||{key:"tot",dir:-1};
+  rows.sort((a,b)=>{ if(sk.key==="unit")return sk.dir*String(a.unit).localeCompare(String(b.unit)); return sk.dir*(((a[sk.key])||0)-((b[sk.key])||0)); });
+  const tb=$("cogsBody"); tb.innerHTML="";
+  rows.forEach(u=>{ const isCK=(u.revTot<=0);
+    const pcell=u.pct==null?"\u2014":`<span class="cogs-pill ${costBand(u.pct,targetFor(u.unit))} pctcell" data-unit="${u.unit}">${pct(u.pct)}</span>`;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><span class="rel-dot rel-${u.relDot}"></span> ${u.unit}${isCK?' <span class="muted" style="font-size:11px">(no rev)</span>':''}</td>`+
+      `<td>${money(u.K)}</td><td>${money(u.B)}</td><td>${money(u.E)}</td><td>${money(u.tot)}</td><td>${money(u.revTot)}</td><td>${pcell}</td>`;
+    tb.appendChild(tr); });
+  if(!rows.length) tb.innerHTML='<tr><td colspan="7" class="muted">Tak ada data pada filter ini.</td></tr>'; }
+function showDayPopup(unit){
+  const {from,to}=cogsRange();
+  const cd=STATE.data.DML_Cost_Daily||[]; const cday={};
+  cd.forEach(r=>{ if(String(r.Unit||"").trim()!==unit)return; const t=dstr(r.Tanggal); if(t<from||t>to)return;
+    const b=String(r.Bucket||"").toUpperCase(); (cday[t]=cday[t]||{K:0,B:0,E:0}); const a=Number(r.Amount)||0;
+    if(b==="KITCHEN")cday[t].K+=a; else if(b==="BAR")cday[t].B+=a; else if(b==="EVENT")cday[t].E+=a; });
+  const rv=revDaysForUnit(unit,from,to); const revMap={}; rv.days.forEach(d=>revMap[d.date]={rev:d.rev,src:d.src});
+  const dates=[...new Set([...Object.keys(cday),...Object.keys(revMap)])].sort();
+  openOverlay("Rincian harian "+unit, from+" s/d "+to);
+  let rows=dates.map(t=>{ const c=cday[t]||{K:0,B:0,E:0}; const rm=revMap[t]||{rev:0,src:""};
+    const tag=rm.src?`<span class="daytag ${rm.src}">${rm.src}</span>`:"";
+    return `<tr><td>${t}</td><td class="rt">${moneyFull(c.K)}</td><td class="rt">${moneyFull(c.B)}</td>`+
+      `<td class="rt">${moneyFull(c.E)}</td><td class="rt">${moneyFull(rm.rev)}</td><td>${tag}</td></tr>`; }).join("");
+  if(!dates.length) rows='<tr><td colspan="6" class="muted">Tak ada data pada periode ini.</td></tr>';
+  $("puBody").innerHTML=`<table class="daytbl"><thead><tr><th>Tanggal</th><th class="rt">Kitchen</th><th class="rt">Bar</th>`+
+    `<th class="rt">Event</th><th class="rt">Revenue</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+document.addEventListener("click",e=>{ const el=e.target.closest(".pctcell"); if(el){ e.stopPropagation(); showDayPopup(el.dataset.unit); } });
+function initCogsFilters(){
+  const dim=STATE.data.DIM_UNIT||[]; const units=cogsUnitsAll(); const grpOf={}; dim.forEach(d=>{ grpOf[String(d.Unit).trim()]=d.Grup||""; });
+  const clusters=[...new Set(units.map(u=>grpOf[u]).filter(Boolean))].sort();
+  $("cogsCluster").innerHTML='<option value="">Semua</option>'+clusters.map(c=>`<option value="${c}">${c}</option>`).join("");
+  const box=$("cogsUnitBox");
+  const paint=(list)=>{ box.innerHTML=
+    '<div class="uctrl"><button type="button" data-sel="all">Pilih semua</button><button type="button" data-sel="none">Kosongkan</button></div>'
+    +list.map(u=>`<label class="uchk"><input type="checkbox" value="${u}" checked> ${u}</label>`).join(""); updUnitLabel(); };
+  paint(units);
+  function updUnitLabel(){ const all=box.querySelectorAll("input").length, ck=box.querySelectorAll("input:checked").length;
+    $("cogsUnitBtn").textContent="Unit: "+(ck===all?"semua":ck+"/"+all)+" \u25be"; }
+  $("cogsUnitBtn").onclick=(e)=>{ e.stopPropagation(); box.classList.toggle("open"); };
+  document.addEventListener("click",(e)=>{ if(!e.target.closest(".uddrop")) box.classList.remove("open"); });
+  $("cogsCluster").onchange=()=>{ const c=$("cogsCluster").value; paint(c?units.filter(u=>grpOf[u]===c):units); renderCogs(); };
+  box.onchange=()=>{ updUnitLabel(); renderCogs(); };
+  box.addEventListener("click",(e)=>{ const s=e.target.dataset.sel; if(!s)return;
+    box.querySelectorAll("input[type=checkbox]").forEach(i=>i.checked=(s==="all")); updUnitLabel(); renderCogs(); });
+  if(!$("cogsFrom").value){ $("cogsFrom").value=(STATE.currentMonth||"")+"-01"; $("cogsTo").value=STATE.lastActualDate||""; }
+  $("cogsFrom").onchange=renderCogs; $("cogsTo").onchange=renderCogs; $("cogsInclCK").onchange=renderCogs;
+  let _fwdT; $("cogsFwd").oninput=()=>{ clearTimeout(_fwdT); _fwdT=setTimeout(renderCogs,300); };
+  $("cogsTgt").oninput=()=>{ STATE.cogsSlider=Number($("cogsTgt").value)/100; $("cogsTgtVal").textContent=$("cogsTgt").value+"%"; renderCogsTotal(); renderCogsTable(); };
+  document.querySelectorAll("#cogsTable th[data-sort]").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; const cur=STATE.cogsSort||{key:"tot",dir:-1};
+    STATE.cogsSort={key:k,dir:cur.key===k?-cur.dir:-1}; renderCogsTable(); });
+  // ---- C-2 wiring ----
+  STATE.dmlChips={}; STATE.topMode="item";
+  $("dmlLoad").onclick=loadDMLDetail;
+  document.querySelectorAll("#grp-cost .chip[data-f]").forEach(ch=>ch.onclick=()=>{ const f=ch.dataset.f;
+    STATE.dmlChips[f]=!STATE.dmlChips[f]; ch.classList.toggle("active",STATE.dmlChips[f]); if(STATE.dml)renderDetail(); });
+$("dmlBucket").onchange=()=>{ if(STATE.dml)renderDetail(); };
+  $("dmlKategori").onchange=()=>{ if(STATE.dml)renderDetail(); };
+  $("dmlNhari").oninput=()=>{ if(STATE.dmlChips&&STATE.dmlChips.rutin&&STATE.dml)renderDetail(); };
+  $("dmlSearch").oninput=()=>{ if(STATE.dml)renderDetail(); };
+  document.querySelectorAll("#dmlTable th[data-sort]").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort;
+    const cur=STATE.dmlSort; STATE.dmlSort={key:k,dir:(cur&&cur.key===k)?-cur.dir:1}; if(STATE.dml)renderDetail(); });
+  $("dmlCopy").onclick=copyDetailTSV;
+  ["topSupplier","topKat"].forEach(id=>{ const el=$(id); if(el)el.onchange=()=>{ if(STATE.dml)renderTop(); }; });
+  if($("topN"))$("topN").oninput=()=>{ if(STATE.dml)renderTop(); };
+}
+function fmtQty(v){ const n=Number(v); if(!isFinite(n))return String(v||""); return (Math.round(n*100)/100).toLocaleString("en-US"); }
+function dmlNhari(){ const n=parseInt($("dmlNhari")&&$("dmlNhari").value,10); return isFinite(n)&&n>0?n:3; }
+function fillTopFilters(){
+  const rows=STATE.dml||[];
+  const sups=[...new Set(rows.map(r=>String(r.Supplier||"").trim()).filter(Boolean))].sort();
+  const kats=[...new Set(rows.map(r=>String(r.Kategori||"").trim()).filter(Boolean))].sort();
+  const s=$("topSupplier"), k=$("topKat");
+  if(s){ const c=s.value; s.innerHTML='<option value="ALL">Semua supplier</option>'+sups.map(x=>`<option>${x}</option>`).join(""); if(c&&[...s.options].some(o=>o.value===c))s.value=c; }
+  if(k){ const c=k.value; k.innerHTML='<option value="ALL">Semua kategori</option>'+kats.map(x=>`<option>${x}</option>`).join(""); if(c&&[...k.options].some(o=>o.value===c))k.value=c; }
+}
+function fillDmlKategori(){ const sel=$("dmlKategori"); if(!sel)return; const cur=sel.value;
+  const kats=[...new Set((STATE.dml||[]).map(r=>String(r.Kategori||"").trim()).filter(Boolean))].sort();
+  sel.innerHTML='<option value="ALL">Semua kategori</option>'+kats.map(k=>`<option>${k}</option>`).join("");
+  if(cur&&[...sel.options].some(o=>o.value===cur)) sel.value=cur; }
+function cadKey(u,mid,item){ return String(u).trim()+"|"+((mid!==""&&mid!=null)?mid:item); }
+function cadenceMap(){ const m={}; (STATE.data.DML_Cadence||[]).forEach(r=>{ m[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)]=r; }); return m; }
+async function loadDMLDetail(){
+  const {from,to}=cogsRange(); const units=cogsSelectedUnits();
+  $("dmlLoading").classList.remove("hidden"); $("dmlHint").classList.add("hidden");
+  $("dmlTable").classList.add("hidden"); $("dmlControls").classList.add("hidden");
+  try{
+    const r=await api({action:"getDMLDetail",token:STATE.token,from:from,to:to,units:units});
+    if(!r.ok){ toast("Gagal: "+(r.error||"?")); return; }
+STATE.dml=rowsToObjs(r.headers,r.rows);
+    fillDmlKategori(); fillTopFilters();
+    $("dmlControls").classList.remove("hidden"); $("dmlTable").classList.remove("hidden");
+    renderDetail(); renderTop();
+  }catch(e){ toast("Error: "+e.message); }
+  finally{ $("dmlLoading").classList.add("hidden"); }
+}
+function detailFiltered(){
+  const rows=STATE.dml||[]; const cad=cadenceMap(); const {from}=cogsRange();
+const act=STATE.dmlChips||{}; const bk=$("dmlBucket").value; const q=($("dmlSearch").value||"").toUpperCase();
+  const kat=$("dmlKategori")?$("dmlKategori").value:"ALL";
+  return rows.filter(r=>{
+    if(bk!=="ALL"&&String(r.Bucket).toUpperCase()!==bk) return false;
+    if(kat!=="ALL"&&String(r.Kategori||"")!==kat) return false;
+    if(q&&String(r.Nama_Item||"").toUpperCase().indexOf(q)<0) return false;
+    const c=cad[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)];
+    if(act.spike && !(r.Spike===true||r.Spike==="true")) return false;
+    if(act.baru){ const fo=c?dstr(c.First_Order):""; if(!(fo&&fo>=from)) return false; }
+    if(act.rutin){ const im=c?Number(c.interval_median):NaN; if(!(isFinite(im)&&im<=dmlNhari())) return false; }
+    return true;
+  });
+}
+function renderDetail(){
+  let rows=detailFiltered();
+  const cad=cadenceMap(); const sk=STATE.dmlSort;
+  const loOf=r=>{const c=cad[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)];return c&&c.Last_Order?dstr(c.Last_Order):"";};
+  if(sk){ const val=r=>({tgl:r.Tanggal,unit:r.Unit,dept:r.Bucket,item:r.Nama_Item||"",kat:r.Kategori||"",qty:Number(r.Qty)||0,amount:Number(r.Amount)||0,last:loOf(r)}[sk.key]);
+    rows=rows.slice().sort((a,b)=>{const x=val(a),y=val(b);return (typeof x==="number"&&typeof y==="number")?sk.dir*(x-y):sk.dir*String(x).localeCompare(String(y));});
+  } else rows=rows.slice().sort((a,b)=>String(a.Tanggal+a.Unit+(a.Nama_Item||"")).localeCompare(String(b.Tanggal+b.Unit+(b.Nama_Item||""))));
+  const tb=$("dmlBody");
+  tb.innerHTML=rows.slice(0,600).map(r=>{
+    let sp="";
+    if(r.Spike===true||r.Spike==="true"){ const raw=String(r.Flag_Raw||"");
+      sp=`<span class="daytag" style="background:#F2D2D2;color:#8C2F2F">spike</span>`+(raw?` <span class="muted" style="font-size:11px">${raw}</span>`:""); }
+    const amt=(r.Amount===""||r.Amount==null)?'\u2014':moneyFull(r.Amount);
+    const lo=loOf(r)||'\u2014';
+    return `<tr><td>${r.Tanggal}</td><td>${r.Unit}</td><td>${r.Bucket}</td><td>${r.Nama_Item||""}</td><td>${r.Kategori||""}</td>`+
+      `<td class="rt">${fmtQty(r.Qty)}</td><td class="rt">${amt}</td><td>${lo}</td><td style="white-space:normal;min-width:200px">${sp}</td></tr>`;
+  }).join("") || '<tr><td colspan="9" class="muted">Tak ada baris cocok filter.</td></tr>';
+  const totQty=rows.reduce((s,r)=>s+(Number(r.Qty)||0),0);
+  const totAmt=rows.reduce((s,r)=>s+(Number(r.Amount)||0),0);
+  $("dmlFoot").innerHTML=rows.length?`<tr><td colspan="5" class="rt"><b>TOTAL (${rows.length} baris${rows.length>600?', tampil 600':''})</b></td><td class="rt"><b>${fmtQty(totQty)}</b></td><td class="rt"><b>${moneyFull(totAmt)}</b></td><td colspan="2"></td></tr>`:"";
+  $("dmlCount").textContent=rows.length+" baris"+(rows.length>600?" (tampil 600)":"");
+}
+function renderTop(){
+  const all=STATE.dml||[];
+  const fSup=$("topSupplier")?$("topSupplier").value:"ALL";
+  const fKat=$("topKat")?$("topKat").value:"ALL";
+  const topN=(()=>{const n=parseInt($("topN")&&$("topN").value,10);return isFinite(n)&&n>0?Math.min(n,100):10;})();
+  const rows=all.filter(r=>{
+    if(fSup!=="ALL"&&String(r.Supplier||"").trim()!==fSup) return false;
+    if(fKat!=="ALL"&&String(r.Kategori||"")!==fKat) return false;
+    return true;
+  });
+  const items={};
+  rows.forEach(r=>{ const it=r.Nama_Item||"(tanpa nama)"; const sup=(String(r.Supplier||"").trim())||"(tanpa supplier)";
+    const qty=Number(r.Qty)||0, amt=Number(r.Amount)||0, hrg=Number(r.Harga)||0, t=dstr(r.Tanggal); const kat=String(r.Kategori||"");
+    const I=items[it]=items[it]||{name:it,qty:0,amt:0,kat:{},sup:{}}; I.qty+=qty; I.amt+=amt;
+    if(kat) I.kat[kat]=(I.kat[kat]||0)+amt;
+    const S=I.sup[sup]=I.sup[sup]||{name:sup,qty:0,amt:0,lastDate:"",lastPrice:null};
+    S.qty+=qty; S.amt+=amt; if(t>=S.lastDate){ S.lastDate=t; S.lastPrice=hrg; } });
+  const list=Object.values(items).sort((a,b)=>b.amt-a.amt).slice(0,topN);
+  const katOf=I=>{const e=Object.entries(I.kat).sort((a,b)=>b[1]-a[1])[0];return e?e[0]:"";};
+  $("topBody").innerHTML=(list.map((x,i)=>{
+    const sups=Object.values(x.sup).sort((a,b)=>b.amt-a.amt);
+    const prices=sups.map(s=>s.lastPrice).filter(p=>p!=null&&p>0);
+    const minP=prices.length?Math.min(...prices):null;
+    let out=`<tr><td><b>${i+1}</b></td><td><b>${x.name}</b></td><td>${katOf(x)}</td><td></td><td></td><td class="rt"><b>${fmtQty(x.qty)}</b></td><td class="rt"><b>${moneyFull(x.amt)}</b></td></tr>`;
+    out+=sups.map(s=>{ let rmk="";
+      if(minP!=null&&s.lastPrice!=null&&prices.length>1){
+        rmk=(s.lastPrice===minP)?'<span class="rmk min">termurah</span>'
+           :`<span class="rmk up">+${(((s.lastPrice-minP)/minP)*100).toFixed(0)}%</span>`; }
+      const hr=(s.lastPrice!=null)?moneyFull(s.lastPrice):'\u2014';
+      return `<tr class="subrow"><td></td><td></td><td></td><td class="sup">${s.name}</td><td class="rt">${hr}${rmk}</td><td class="rt">${fmtQty(s.qty)}</td><td class="rt">${moneyFull(s.amt)}</td></tr>`;
+    }).join("");
+    return out;
+  }).join("")) || '<tr><td colspan="7" class="muted">Belum ada data. Klik "Muat / perbarui detail".</td></tr>';
+}
+function renderOverdue(){
+  const sel=new Set(cogsSelectedUnits());
+  const over=(STATE.data.DML_Cadence||[]).filter(r=> sel.has(String(r.Unit).trim()) &&
+    String(r.Keyakinan).toUpperCase()==="TINGGI" && String(r.Status).toUpperCase()==="OVERDUE")
+    .sort((a,b)=>(Number(b.Hari_Sejak_Terakhir)||0)-(Number(a.Hari_Sejak_Terakhir)||0));
+  $("overBody").innerHTML = over.length
+    ? '<table class="daytbl"><thead><tr><th>Unit</th><th>Item</th><th class="rt" title="Sudah berapa hari sejak order terakhir">Sudah (hari)</th><th class="rt" title="Jarak hari antar-order yang biasa">Jeda biasa (hari)</th></tr></thead><tbody>'+
+      over.slice(0,60).map(r=>`<tr><td>${r.Unit}</td><td>${r.Nama_Item}</td><td class="rt">${r.Hari_Sejak_Terakhir}</td><td class="rt">${r.interval_median}</td></tr>`).join("")+'</tbody></table>'
+    : '<span class="muted">Tak ada item overdue (Keyakinan TINGGI) pada unit terpilih.</span>';
+}
+function copyDetailTSV(){
+  const rows=detailFiltered().sort((a,b)=>String(a.Tanggal+a.Unit+(a.Nama_Item||"")).localeCompare(String(b.Tanggal+b.Unit+(b.Nama_Item||""))));
+  if(!rows.length){ toast("Tak ada baris"); return; }
+  const cad=cadenceMap();
+  const lines=rows.map(r=>{ const c=cad[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)];
+    const lo=(c&&c.Last_Order)?dstr(c.Last_Order):"";
+    const amt=(r.Amount===""||r.Amount==null)?"":Math.round(Number(r.Amount)||0);
+    const sp=(r.Spike===true||r.Spike==="true")?"SPIKE":"";
+    return [r.Tanggal,r.Unit,r.Bucket,r.Nama_Item||"",r.Kategori||"",Number(r.Qty)||0,amt,lo,sp].join("\t"); });
+  const head="Tanggal\tUnit\tDept\tItem\tKategori\tQty\tAmount\tOrder_Terakhir\tSpike";
+  const tsv=head+"\n"+lines.join("\n");
+  const done=()=>toast(lines.length+" baris tersalin");
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(tsv).then(done).catch(()=>fallbackCopy(tsv,done)); } else fallbackCopy(tsv,done);
+}
+async function ensureCostData(){
+  if(!GRP_LOADED.cost){
+    $("cogsLoading").classList.remove("hidden");
+    try{ const res=await getTabsBatch(["DML_Cost_Daily","DML_Cadence"]);
+      ["DML_Cost_Daily","DML_Cadence"].forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
+      GRP_LOADED.cost=true; initCogsFilters();
+    }catch(e){ $("cogsBanner").innerHTML='<div class="cogs-banner warn">Gagal memuat COGS: '+e.message+'</div>'; return; }
+    finally{ $("cogsLoading").classList.add("hidden"); } }
+  renderCogs();
+}
+document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>showGroup(b.dataset.grp));
+
+/* hamburger (mobile) */
+function openSidebar(){ $("sidebar").classList.add("open"); $("backdrop").classList.add("show"); }
+function closeSidebar(){ $("sidebar").classList.remove("open"); $("backdrop").classList.remove("show"); }
+$("hamb").onclick=openSidebar; $("backdrop").onclick=closeSidebar;
+
+/* logout & refresh di sidebar */
+$("logoutBtn2").onclick=async()=>{ try{ await api({action:"logout",token:STATE.token}); }catch(e){} location.reload(); };
+$("refreshBtn").onclick=reloadData;
+async function reloadData(){
+  const btn=$("refreshBtn"); const old=btn.textContent; btn.disabled=true; btn.textContent="Memuat\u2026";
+  try{
+    const need=["Revenue_Master","Budget_Master","Forecast_Output","Event_Pipeline","DIM_UNIT","DIM_TANGGAL"];
+    const results=await getTabsBatch(need);
+    need.forEach(t=>{ const r=results[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
+    STATE._dayInfo=null;
+    computePeriod(); computeSectionC(); renderKPI(); renderTableC(); renderTableD();
+    renderDailyChart(); renderSmallMultiples();
+    toast("Data diperbarui");
+  }catch(e){ showErr("Gagal refresh: "+e.message); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
 </script>
 </body>
 </html>
