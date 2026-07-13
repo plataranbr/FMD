@@ -459,6 +459,9 @@
                 <button class="chip" data-f="rutin">Order rutin ≤</button>
                 <input id="dmlNhari" type="number" min="1" value="3" style="width:44px"> <span class="muted" style="font-size:11px">hari</span>
               </div>
+              <select id="dmlUnitLocal"><option value="ALL">Semua unit</option></select>
+              <input type="date" id="dmlFromLocal" title="Dari (lokal)">
+              <input type="date" id="dmlToLocal" title="s/d (lokal)">
               <select id="dmlBucket"><option value="ALL">Semua dept</option><option>KITCHEN</option><option>BAR</option><option>EVENT</option></select>
               <select id="dmlKategori"><option value="ALL">Semua kategori</option></select>
               <input id="dmlSearch" placeholder="cari item…" class="dml-search">
@@ -466,13 +469,15 @@
               <span id="dmlCount" class="muted"></span>
             </div>
             <div style="overflow-x:auto"><table id="dmlTable" class="daytbl hidden">
-              <thead><tr><th>Tanggal</th><th>Unit</th><th>Dept</th><th>Item</th><th>Kategori</th><th class="rt">Qty</th><th class="rt">Amount</th><th>Order terakhir</th><th>Flag</th></tr></thead>
+              <thead><tr><th data-sort="tgl">Tanggal</th><th data-sort="unit">Unit</th><th data-sort="dept">Dept</th><th data-sort="item">Item</th><th data-sort="kat">Kategori</th><th class="rt" data-sort="qty">Qty</th><th class="rt" data-sort="amount">Amount</th><th data-sort="last">Order terakhir</th><th>Flag</th></tr></thead>
               <tbody id="dmlBody"></tbody><tfoot id="dmlFoot"></tfoot></table></div>
           </div>
         </section>
         <section class="section">
           <div class="sec-head"><div><div class="eyebrow">COGS #5</div><h2>Top Purchase</h2></div>
             <div class="topctrl">
+              <select id="topUnit"><option value="ALL">Semua unit</option></select>
+              <select id="topDept"><option value="ALL">Semua dept</option><option>KITCHEN</option><option>BAR</option><option>EVENT</option></select>
               <select id="topSupplier"><option value="ALL">Semua supplier</option></select>
               <select id="topKat"><option value="ALL">Semua kategori</option></select>
               <label class="topn">Top <input type="number" id="topN" min="1" max="100" value="10"></label>
@@ -483,8 +488,8 @@
         </section>
         <section class="section">
           <div class="sec-head"><div><div class="eyebrow">COGS #3</div><h2>Perlu Perhatian — Overdue</h2></div>
-            <span class="muted" style="font-size:12px">Keyakinan TINGGI, unit terpilih</span></div>
-          <div class="sec-body"><div id="overBody"></div></div>
+            <div class="topctrl"><select id="overUnit"><option value="ALL">Semua unit</option></select><button id="overLoad" class="udbtn">Muat Overdue</button></div></div>
+          <div class="sec-body"><div id="overBody"><span class="muted" style="font-size:13px">Klik "Muat Overdue" untuk menampilkan item yang melewati jadwal order (Keyakinan TINGGI).</span></div></div>
         </section>
       </div>
     </div>
@@ -1326,7 +1331,13 @@ function cogsData(){
     u.relDot=u.inc>0?"INCOMPLETE":(u.ind>0?"INDICATIVE":"RELIABLE"); });
   return {U,relAmt,from,to};
 }
-function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderCogsTable(); renderOverdue(); }
+function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderCogsTable(); }
+async function ensureCadence(){
+  if(STATE.data.DML_Cadence) return;
+  try{ const res=await getTabsBatch(["DML_Cadence"]);
+    STATE.data.DML_Cadence=(res.DML_Cadence&&res.DML_Cadence.ok)?rowsToObjs(res.DML_Cadence.headers,res.DML_Cadence.rows):[];
+  }catch(e){ STATE.data.DML_Cadence=[]; }
+}
 function renderCogsWarn(){ const {from,to}=cogsRange(); const days=rangeDays(from,to); const n=cogsFwd(); let msg="";
   if(n>LEAD_TIME_MIN) msg="\u26a0 +"+n+" hari forecast melebihi lead-time belanja (~"+LEAD_TIME_MIN+" hari). Revenue hari-hari itu ditambahkan tanpa cost pasangannya \u2014 rasio bisa turun palsu.";
   else if(days>0&&days<LEAD_TIME_MIN) msg="\u26a0 Periode terlalu pendek ("+days+" hari). Belanja hari ini sering untuk stok beberapa hari ke depan, jadi rasio bisa terlihat terlalu tinggi. Pilih minimal 1 minggu untuk angka yang wajar.";
@@ -1414,11 +1425,25 @@ $("dmlBucket").onchange=()=>{ if(STATE.dml)renderDetail(); };
   document.querySelectorAll("#dmlTable th[data-sort]").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort;
     const cur=STATE.dmlSort; STATE.dmlSort={key:k,dir:(cur&&cur.key===k)?-cur.dir:1}; if(STATE.dml)renderDetail(); });
   $("dmlCopy").onclick=copyDetailTSV;
-  ["topSupplier","topKat"].forEach(id=>{ const el=$(id); if(el)el.onchange=()=>{ if(STATE.dml)renderTop(); }; });
+  ["topSupplier","topKat","topUnit","topDept"].forEach(id=>{ const el=$(id); if(el)el.onchange=()=>{ if(STATE.dml)renderTop(); }; });
   if($("topN"))$("topN").oninput=()=>{ if(STATE.dml)renderTop(); };
+  ["dmlUnitLocal","dmlFromLocal","dmlToLocal"].forEach(id=>{ const el=$(id); if(el)el.onchange=()=>{ if(STATE.dml)renderDetail(); }; });
+  if($("overLoad"))$("overLoad").onclick=async()=>{ $("overBody").innerHTML='<span class="cogs-loading"><span class="spin"></span> Memuat…</span>'; await ensureCadence(); fillOverUnit(); renderOverdue(); };
+  if($("overUnit"))$("overUnit").onchange=()=>{ if(STATE.data.DML_Cadence)renderOverdue(); };
 }
 function fmtQty(v){ const n=Number(v); if(!isFinite(n))return String(v||""); return (Math.round(n*100)/100).toLocaleString("en-US"); }
 function dmlNhari(){ const n=parseInt($("dmlNhari")&&$("dmlNhari").value,10); return isFinite(n)&&n>0?n:3; }
+function fillLocalUnitDate(){
+  const rows=STATE.dml||[];
+  const units=[...new Set(rows.map(r=>String(r.Unit).trim()).filter(Boolean))].sort();
+  const opts='<option value="ALL">Semua unit</option>'+units.map(x=>`<option>${x}</option>`).join("");
+  [["dmlUnitLocal"],["topUnit"]].forEach(([id])=>{ const el=$(id); if(el){ const c=el.value; el.innerHTML=opts; if(c&&[...el.options].some(o=>o.value===c))el.value=c; } });
+  const dates=rows.map(r=>r.Tanggal).filter(Boolean).sort();
+  if(dates.length){ const f=$("dmlFromLocal"),t=$("dmlToLocal"); if(f)f.value=dates[0]; if(t)t.value=dates[dates.length-1]; }
+}
+function fillOverUnit(){ const sel=$("overUnit"); if(!sel)return; const c=sel.value;
+  const units=[...new Set((STATE.data.DML_Cadence||[]).map(r=>String(r.Unit).trim()).filter(Boolean))].sort();
+  sel.innerHTML='<option value="ALL">Semua unit</option>'+units.map(x=>`<option>${x}</option>`).join(""); if(c&&[...sel.options].some(o=>o.value===c))sel.value=c; }
 function fillTopFilters(){
   const rows=STATE.dml||[];
   const sups=[...new Set(rows.map(r=>String(r.Supplier||"").trim()).filter(Boolean))].sort();
@@ -1440,8 +1465,10 @@ async function loadDMLDetail(){
   try{
     const r=await api({action:"getDMLDetail",token:STATE.token,from:from,to:to,units:units});
     if(!r.ok){ toast("Gagal: "+(r.error||"?")); return; }
-STATE.dml=rowsToObjs(r.headers,r.rows);
-    fillDmlKategori(); fillTopFilters();
+    STATE.dml=rowsToObjs(r.headers,r.rows);
+    STATE.dmlLoaded={from,to,units:units.slice()};
+    await ensureCadence();
+    fillDmlKategori(); fillTopFilters(); fillLocalUnitDate();
     $("dmlControls").classList.remove("hidden"); $("dmlTable").classList.remove("hidden");
     renderDetail(); renderTop();
   }catch(e){ toast("Error: "+e.message); }
@@ -1451,7 +1478,12 @@ function detailFiltered(){
   const rows=STATE.dml||[]; const cad=cadenceMap(); const {from}=cogsRange();
 const act=STATE.dmlChips||{}; const bk=$("dmlBucket").value; const q=($("dmlSearch").value||"").toUpperCase();
   const kat=$("dmlKategori")?$("dmlKategori").value:"ALL";
+  const uLoc=$("dmlUnitLocal")?$("dmlUnitLocal").value:"ALL";
+  const lf=$("dmlFromLocal")?$("dmlFromLocal").value:""; const lt=$("dmlToLocal")?$("dmlToLocal").value:"";
   return rows.filter(r=>{
+    if(uLoc!=="ALL"&&String(r.Unit).trim()!==uLoc) return false;
+    if(lf&&r.Tanggal<lf) return false;
+    if(lt&&r.Tanggal>lt) return false;
     if(bk!=="ALL"&&String(r.Bucket).toUpperCase()!==bk) return false;
     if(kat!=="ALL"&&String(r.Kategori||"")!==kat) return false;
     if(q&&String(r.Nama_Item||"").toUpperCase().indexOf(q)<0) return false;
@@ -1471,9 +1503,10 @@ function renderDetail(){
   } else rows=rows.slice().sort((a,b)=>String(a.Tanggal+a.Unit+(a.Nama_Item||"")).localeCompare(String(b.Tanggal+b.Unit+(b.Nama_Item||""))));
   const tb=$("dmlBody");
   tb.innerHTML=rows.slice(0,600).map(r=>{
-    let sp="";
-    if(r.Spike===true||r.Spike==="true"){ const raw=String(r.Flag_Raw||"");
-      sp=`<span class="daytag" style="background:#F2D2D2;color:#8C2F2F">spike</span>`+(raw?` <span class="muted" style="font-size:11px">${raw}</span>`:""); }
+    const raw=String(r.Flag_Raw||"");
+    const isSpk=(r.Spike===true||r.Spike==="true");
+    let sp = raw ? `<span class="muted" style="font-size:11px">${raw}</span>` : '\u2014';
+    if(isSpk) sp=`<span class="daytag" style="background:#F2D2D2;color:#8C2F2F">SPIKE</span> `+sp;
     const amt=(r.Amount===""||r.Amount==null)?'\u2014':moneyFull(r.Amount);
     const lo=loOf(r)||'\u2014';
     return `<tr><td>${r.Tanggal}</td><td>${r.Unit}</td><td>${r.Bucket}</td><td>${r.Nama_Item||""}</td><td>${r.Kategori||""}</td>`+
@@ -1488,8 +1521,12 @@ function renderTop(){
   const all=STATE.dml||[];
   const fSup=$("topSupplier")?$("topSupplier").value:"ALL";
   const fKat=$("topKat")?$("topKat").value:"ALL";
+  const fUnit=$("topUnit")?$("topUnit").value:"ALL";
+  const fDept=$("topDept")?$("topDept").value:"ALL";
   const topN=(()=>{const n=parseInt($("topN")&&$("topN").value,10);return isFinite(n)&&n>0?Math.min(n,100):10;})();
   const rows=all.filter(r=>{
+    if(fUnit!=="ALL"&&String(r.Unit).trim()!==fUnit) return false;
+    if(fDept!=="ALL"&&String(r.Bucket).toUpperCase()!==fDept) return false;
     if(fSup!=="ALL"&&String(r.Supplier||"").trim()!==fSup) return false;
     if(fKat!=="ALL"&&String(r.Kategori||"")!==fKat) return false;
     return true;
@@ -1519,8 +1556,8 @@ function renderTop(){
   }).join("")) || '<tr><td colspan="7" class="muted">Belum ada data. Klik "Muat / perbarui detail".</td></tr>';
 }
 function renderOverdue(){
-  const sel=new Set(cogsSelectedUnits());
-  const over=(STATE.data.DML_Cadence||[]).filter(r=> sel.has(String(r.Unit).trim()) &&
+  const u=$("overUnit")?$("overUnit").value:"ALL";
+  const over=(STATE.data.DML_Cadence||[]).filter(r=> (u==="ALL"||String(r.Unit).trim()===u) &&
     String(r.Keyakinan).toUpperCase()==="TINGGI" && String(r.Status).toUpperCase()==="OVERDUE")
     .sort((a,b)=>(Number(b.Hari_Sejak_Terakhir)||0)-(Number(a.Hari_Sejak_Terakhir)||0));
   $("overBody").innerHTML = over.length
@@ -1545,8 +1582,8 @@ function copyDetailTSV(){
 async function ensureCostData(){
   if(!GRP_LOADED.cost){
     $("cogsLoading").classList.remove("hidden");
-    try{ const res=await getTabsBatch(["DML_Cost_Daily","DML_Cadence"]);
-      ["DML_Cost_Daily","DML_Cadence"].forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
+    try{ const res=await getTabsBatch(["DML_Cost_Daily"]);
+      ["DML_Cost_Daily"].forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
       GRP_LOADED.cost=true; initCogsFilters();
     }catch(e){ $("cogsBanner").innerHTML='<div class="cogs-banner warn">Gagal memuat COGS: '+e.message+'</div>'; return; }
     finally{ $("cogsLoading").classList.add("hidden"); } }
