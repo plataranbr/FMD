@@ -429,6 +429,7 @@
         </div>
         </div>
         <div id="cogsLoading" class="cogs-loading hidden"><span class="spin"></span> Memuat data COGS…</div>
+        <div id="freshBanner"></div>
         <div id="cogsWarn"></div>
         <div id="cogsBanner"></div>
         <div id="cogsTotal" class="cogs-total"></div>
@@ -436,6 +437,11 @@
           <div class="sec-head"><div><div class="eyebrow">COGS #1</div><h2>Total COGS per Unit</h2></div>
             <span class="muted" style="font-size:12px">Kitchen · Bar · Event</span></div>
           <div class="sec-body"><div class="chart-wrap" style="height:340px"><canvas id="cogsChart"></canvas></div></div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">COGS #1b</div><h2>Cost Harian vs Revenue</h2></div>
+            <span class="muted" style="font-size:12px">Bar = cost (sumbu kiri) · Garis = revenue (kanan) · putus-putus = forecast</span></div>
+          <div class="sec-body"><div class="chart-wrap" style="height:300px"><canvas id="cogsDayChart"></canvas></div></div>
         </section>
         <section class="section">
           <div class="sec-head"><div><div class="eyebrow">COGS #2 & #4</div><h2>COGS per Unit & Rasio</h2></div>
@@ -466,10 +472,11 @@
               <select id="dmlKategori"><option value="ALL">Semua kategori</option></select>
               <input id="dmlSearch" placeholder="cari item…" class="dml-search">
               <button id="dmlCopy" class="udbtn">Salin</button>
+              <button id="dmlPrev" class="udbtn">‹</button><span id="dmlPageInfo" class="muted" style="font-size:12px"></span><button id="dmlNext" class="udbtn">›</button>
               <span id="dmlCount" class="muted"></span>
             </div>
             <div style="overflow-x:auto"><table id="dmlTable" class="daytbl hidden">
-              <thead><tr><th data-sort="tgl">Tanggal</th><th data-sort="unit">Unit</th><th data-sort="dept">Dept</th><th data-sort="item">Item</th><th data-sort="kat">Kategori</th><th class="rt" data-sort="qty">Qty</th><th class="rt" data-sort="amount">Amount</th><th data-sort="last">Order terakhir</th><th>Flag</th></tr></thead>
+              <thead><tr><th data-sort="tgl">Tanggal</th><th data-sort="unit">Unit</th><th data-sort="dept">Dept</th><th data-sort="item">Item</th><th data-sort="kat">Kategori</th><th data-sort="sup">Supplier</th><th class="rt" data-sort="qty">Qty</th><th class="rt" data-sort="amount">Amount</th><th data-sort="last">Order terakhir</th><th>Flag</th></tr></thead>
               <tbody id="dmlBody"></tbody><tfoot id="dmlFoot"></tfoot></table></div>
           </div>
         </section>
@@ -483,13 +490,26 @@
               <label class="topn">Top <input type="number" id="topN" min="1" max="100" value="10"></label>
             </div></div>
           <div class="sec-body"><div style="overflow-x:auto"><table id="topTable" class="daytbl">
-            <thead><tr><th>#</th><th>Item</th><th>Kategori</th><th>Supplier</th><th class="rt">Harga terakhir</th><th class="rt">Qty</th><th class="rt">Amount</th></tr></thead>
+            <thead><tr><th>#</th><th>Item</th><th>Kategori</th><th>Supplier</th><th class="rt">Harga terakhir</th><th>Order terakhir</th><th class="rt">Qty</th><th class="rt">Amount</th></tr></thead>
             <tbody id="topBody"></tbody></table></div></div>
         </section>
         <section class="section">
-          <div class="sec-head"><div><div class="eyebrow">COGS #3</div><h2>Perlu Perhatian — Overdue</h2></div>
-            <div class="topctrl"><select id="overUnit"><option value="ALL">Semua unit</option></select><button id="overLoad" class="udbtn">Muat Overdue</button></div></div>
-          <div class="sec-body"><div id="overBody"><span class="muted" style="font-size:13px">Klik "Muat Overdue" untuk menampilkan item yang melewati jadwal order (Keyakinan TINGGI).</span></div></div>
+          <div class="sec-head"><div><div class="eyebrow">COGS #6</div><h2>Item Rutin</h2></div>
+            <div class="topctrl">
+              <select id="rutUnit"><option value="ALL">Semua unit</option></select>
+              <select id="rutBucket"><option value="ALL">Semua dept</option><option>KITCHEN</option><option>BAR</option><option>EVENT</option></select>
+              <label class="ckchk"><input type="checkbox" id="rutOverdue"> hanya OVERDUE</label>
+              <button id="rutLoad" class="udbtn">Muat</button>
+            </div></div>
+          <div class="sec-body">
+            <div class="chips" id="rutTabs" style="margin-bottom:8px">
+              <button class="chip active" data-t="HARIAN">Harian</button>
+              <button class="chip" data-t="MINGGUAN">Mingguan</button>
+              <button class="chip" data-t="BULANAN">Bulanan</button>
+              <button class="chip" data-t="BELUM">Belum pasti</button>
+            </div>
+            <div id="rutBody"><span class="muted" style="font-size:13px">Klik "Muat" untuk menampilkan item rutin per unit beserta order terakhirnya.</span></div>
+          </div>
         </section>
       </div>
     </div>
@@ -1331,7 +1351,67 @@ function cogsData(){
     u.relDot=u.inc>0?"INCOMPLETE":(u.ind>0?"INDICATIVE":"RELIABLE"); });
   return {U,relAmt,from,to};
 }
-function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderCogsTable(); }
+function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderDayChart(); renderCogsTable(); }
+/* ===== Chart cost harian vs revenue (dual axis) ===== */
+function renderDayChart(){
+  const ctx=$("cogsDayChart"); if(!ctx)return;
+  const {from,to}=cogsRange(); const inclCK=$("cogsInclCK").checked;
+  const units=cogsSelectedUnits().filter(u=>inclCK||u!=="CK");
+  const sel=new Set(units); const cost={};
+  (STATE.data.DML_Cost_Daily||[]).forEach(r=>{ const u=String(r.Unit||"").trim(); if(!sel.has(u))return;
+    const t=dstr(r.Tanggal); if(t<from||t>to)return; cost[t]=(cost[t]||0)+(Number(r.Amount)||0); });
+  const rev={},fcDay={};
+  units.forEach(u=>{ revDaysForUnit(u,from,to).days.forEach(d=>{ rev[d.date]=(rev[d.date]||0)+d.rev;
+    if(d.src==="forecast")fcDay[d.date]=true; }); });
+  const labels=dayList(from,to);
+  if(STATE.charts.cogsDay)STATE.charts.cogsDay.destroy();
+  STATE.charts.cogsDay=new Chart(ctx,{data:{labels,datasets:[
+    {type:"bar",label:"Cost (DML)",yAxisID:"y",data:labels.map(t=>cost[t]||0),backgroundColor:getCSS("--navy")},
+    {type:"line",label:"Revenue",yAxisID:"y2",data:labels.map(t=>rev[t]||0),borderColor:getCSS("--we"),
+      pointRadius:2,tension:.2,segment:{borderDash:c=>fcDay[labels[c.p1DataIndex]]?[5,4]:undefined}}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom"},tooltip:{callbacks:{
+        label:c=>c.dataset.label+": "+fmt(c.parsed.y),
+        afterBody:it=>{ const t=labels[it[0].dataIndex]; const cv=cost[t]||0,rv=rev[t]||0;
+          return rv>0?["Ratio hari ini: "+(cv/rv*100).toFixed(1)+"%"]:[]; }}}},
+      scales:{y:{position:"left",title:{display:true,text:"Cost"},ticks:{callback:v=>fmt(v)}},
+        y2:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Revenue"},ticks:{callback:v=>fmt(v)}},
+        x:{ticks:{maxRotation:60,callback:function(v){return this.getLabelForValue(v).slice(8,10);}}}}}});
+}
+/* ===== Freshness banner ===== */
+async function ensureFreshness(){
+  if(!STATE.fresh){ try{ const r=await api({action:"getFreshness",token:STATE.token}); if(r&&r.ok)STATE.fresh=r; }catch(e){} }
+  const f=STATE.fresh, el=$("freshBanner"); if(!el)return;
+  if(!f){ el.innerHTML=""; return; }
+  const stuck=String(f.dml_status||"OK")!=="OK";
+  el.innerHTML=`<div class="cogs-banner${stuck?" warn":""}" style="font-size:12px">Freshness — DML: ${f.dml||"—"} · Cost harian: ${f.cost_daily||"—"} · Cadence: ${f.cadence||"—"}${stuck?" · \u26a0 proses DML sedang berjalan/tertahan, angka bisa belum lengkap":""}</div>`;
+}
+/* ===== Item Rutin ===== */
+const RUT_TABS={HARIAN:["HARIAN","2-3 HARIAN"],MINGGUAN:["MINGGUAN","DWI-MINGGUAN"],BULANAN:["BULANAN+"],BELUM:["BELUM PASTI"]};
+function fillRutUnit(){ const sel=$("rutUnit"); if(!sel)return; const c=sel.value;
+  const units=[...new Set((STATE.data.DML_Cadence||[]).map(r=>String(r.Unit).trim()).filter(Boolean))].sort();
+  sel.innerHTML='<option value="ALL">Semua unit</option>'+units.map(x=>`<option>${x}</option>`).join("");
+  if(c&&[...sel.options].some(o=>o.value===c))sel.value=c; }
+function renderRutin(){
+  const u=$("rutUnit").value, b=$("rutBucket").value, onlyOv=$("rutOverdue").checked;
+  const cls=new Set(RUT_TABS[STATE.rutTab||"HARIAN"]);
+  const isOv=r=>String(r.Status||"").toUpperCase()==="OVERDUE";
+  const rows=(STATE.data.DML_Cadence||[]).filter(r=>
+    (u==="ALL"||String(r.Unit).trim()===u)&&
+    (b==="ALL"||String(r.Bucket||"").toUpperCase()===b)&&
+    cls.has(String(r.Kelas||"").toUpperCase())&&(!onlyOv||isOv(r)))
+    .sort((x,y)=>{ const d=(isOv(x)?0:1)-(isOv(y)?0:1); if(d)return d;
+      return (Number(y.Hari_Sejak_Terakhir)||0)-(Number(x.Hari_Sejak_Terakhir)||0); });
+  $("rutBody").innerHTML = rows.length
+    ? '<table class="daytbl"><thead><tr><th>Item</th><th>Unit</th><th>Dept</th><th class="rt" title="Jarak antar-order yang biasa">Interval (hr)</th><th>Order terakhir</th><th class="rt">Sudah (hr)</th><th>Keyakinan</th><th>Status</th></tr></thead><tbody>'+
+      rows.slice(0,300).map(r=>`<tr><td>${r.Nama_Item}</td><td>${r.Unit}</td><td>${r.Bucket||""}</td><td class="rt">${r.interval_median}</td><td>${dstr(r.Last_Order)}</td><td class="rt">${r.Hari_Sejak_Terakhir}</td><td>${r.Keyakinan||""}</td><td>${isOv(r)?'<span class="daytag" style="background:#F2D2D2;color:#8C2F2F">OVERDUE</span>':"\u2014"}</td></tr>`).join("")
+      +'</tbody></table>'+(rows.length>300?`<div class="muted" style="font-size:12px">Menampilkan 300 dari ${rows.length} baris — persempit filter.</div>`:"")
+    : '<span class="muted">Tak ada item pada filter/tab ini.</span>';
+}
+/* ===== Lazy-load DML per bulan kalender ===== */
+function monthsBetween(from,to){ const out=[]; let d=new Date(from.slice(0,7)+"-01T00:00:00Z");
+  while(d.toISOString().slice(0,7)<=to.slice(0,7)){ out.push(d.toISOString().slice(0,7)); d.setUTCMonth(d.getUTCMonth()+1); } return out; }
+function monthEnd(m){ const d=new Date(m+"-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth()+1); d.setUTCDate(0); return d.toISOString().slice(0,10); }
 async function ensureCadence(){
   if(STATE.data.DML_Cadence) return;
   try{ const res=await getTabsBatch(["DML_Cadence"]);
@@ -1380,14 +1460,15 @@ function showDayPopup(unit){
     if(b==="KITCHEN")cday[t].K+=a; else if(b==="BAR")cday[t].B+=a; else if(b==="EVENT")cday[t].E+=a; });
   const rv=revDaysForUnit(unit,from,to); const revMap={}; rv.days.forEach(d=>revMap[d.date]={rev:d.rev,src:d.src});
   const dates=[...new Set([...Object.keys(cday),...Object.keys(revMap)])].sort();
-  openOverlay("Rincian harian "+unit, from+" s/d "+to);
+  openOverlay("Rincian harian "+unit, from+" s/d "+to+" \u00b7 ratio harian bisa bias \u2014 belanja hari ini utk stok beberapa hari");
   let rows=dates.map(t=>{ const c=cday[t]||{K:0,B:0,E:0}; const rm=revMap[t]||{rev:0,src:""};
     const tag=rm.src?`<span class="daytag ${rm.src}">${rm.src}</span>`:"";
+    const ct=c.K+c.B+c.E; const rt=rm.rev>0?(ct/rm.rev*100).toFixed(1)+"%":"\u2014";
     return `<tr><td>${t}</td><td class="rt">${moneyFull(c.K)}</td><td class="rt">${moneyFull(c.B)}</td>`+
-      `<td class="rt">${moneyFull(c.E)}</td><td class="rt">${moneyFull(rm.rev)}</td><td>${tag}</td></tr>`; }).join("");
-  if(!dates.length) rows='<tr><td colspan="6" class="muted">Tak ada data pada periode ini.</td></tr>';
+      `<td class="rt">${moneyFull(c.E)}</td><td class="rt">${moneyFull(rm.rev)}</td><td class="rt">${rt}</td><td>${tag}</td></tr>`; }).join("");
+  if(!dates.length) rows='<tr><td colspan="7" class="muted">Tak ada data pada periode ini.</td></tr>';
   $("puBody").innerHTML=`<table class="daytbl"><thead><tr><th>Tanggal</th><th class="rt">Kitchen</th><th class="rt">Bar</th>`+
-    `<th class="rt">Event</th><th class="rt">Revenue</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<th class="rt">Event</th><th class="rt">Revenue</th><th class="rt" title="Cost harian \u00f7 revenue harian">Ratio</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 document.addEventListener("click",e=>{ const el=e.target.closest(".pctcell"); if(el){ e.stopPropagation(); showDayPopup(el.dataset.unit); } });
 function initCogsFilters(){
@@ -1428,8 +1509,13 @@ $("dmlBucket").onchange=()=>{ if(STATE.dml)renderDetail(); };
   ["topSupplier","topKat","topUnit","topDept"].forEach(id=>{ const el=$(id); if(el)el.onchange=()=>{ if(STATE.dml)renderTop(); }; });
   if($("topN"))$("topN").oninput=()=>{ if(STATE.dml)renderTop(); };
   ["dmlUnitLocal","dmlFromLocal","dmlToLocal"].forEach(id=>{ const el=$(id); if(el)el.onchange=()=>{ if(STATE.dml)renderDetail(); }; });
-  if($("overLoad"))$("overLoad").onclick=async()=>{ $("overBody").innerHTML='<span class="cogs-loading"><span class="spin"></span> Memuat…</span>'; await ensureCadence(); fillOverUnit(); renderOverdue(); };
-  if($("overUnit"))$("overUnit").onchange=()=>{ if(STATE.data.DML_Cadence)renderOverdue(); };
+  $("dmlPrev").onclick=()=>{ STATE.dmlPage=(STATE.dmlPage||1)-1; renderDetail(); };
+  $("dmlNext").onclick=()=>{ STATE.dmlPage=(STATE.dmlPage||1)+1; renderDetail(); };
+  $("rutLoad").onclick=async()=>{ $("rutBody").innerHTML='<span class="cogs-loading"><span class="spin"></span> Memuat…</span>'; await ensureCadence(); fillRutUnit(); renderRutin(); };
+  ["rutUnit","rutBucket","rutOverdue"].forEach(id=>{ $(id).onchange=()=>{ if(STATE.data.DML_Cadence)renderRutin(); }; });
+  document.querySelectorAll("#rutTabs .chip").forEach(ch=>ch.onclick=()=>{ STATE.rutTab=ch.dataset.t;
+    document.querySelectorAll("#rutTabs .chip").forEach(c=>c.classList.toggle("active",c===ch));
+    if(STATE.data.DML_Cadence)renderRutin(); });
 }
 function fmtQty(v){ const n=Number(v); if(!isFinite(n))return String(v||""); return (Math.round(n*100)/100).toLocaleString("en-US"); }
 function dmlNhari(){ const n=parseInt($("dmlNhari")&&$("dmlNhari").value,10); return isFinite(n)&&n>0?n:3; }
@@ -1459,14 +1545,21 @@ function fillDmlKategori(){ const sel=$("dmlKategori"); if(!sel)return; const cu
 function cadKey(u,mid,item){ return String(u).trim()+"|"+((mid!==""&&mid!=null)?mid:item); }
 function cadenceMap(){ const m={}; (STATE.data.DML_Cadence||[]).forEach(r=>{ m[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)]=r; }); return m; }
 async function loadDMLDetail(){
-  const {from,to}=cogsRange(); const units=cogsSelectedUnits();
+  const {from,to}=cogsRange();
+  STATE.dmlByMonth=STATE.dmlByMonth||{};
   $("dmlLoading").classList.remove("hidden"); $("dmlHint").classList.add("hidden");
   $("dmlTable").classList.add("hidden"); $("dmlControls").classList.add("hidden");
   try{
-    const r=await api({action:"getDMLDetail",token:STATE.token,from:from,to:to,units:units});
-    if(!r.ok){ toast("Gagal: "+(r.error||"?")); return; }
-    STATE.dml=rowsToObjs(r.headers,r.rows);
-    STATE.dmlLoaded={from,to,units:units.slice()};
+    const curM=(STATE.lastActualDate||"").slice(0,7);
+    const months=monthsBetween(from,to);
+    for(const m of months){
+      if(STATE.dmlByMonth[m] && m!==curM) continue;           // cache bulan lampau; bulan berjalan selalu segar
+      const r=await api({action:"getDMLDetail",token:STATE.token,from:m+"-01",to:monthEnd(m),units:cogsUnitsAll()});
+      if(!r.ok){ toast("Gagal bulan "+m+": "+(r.error||"?")); if(!STATE.dmlByMonth[m])STATE.dmlByMonth[m]=[]; continue; }
+      STATE.dmlByMonth[m]=rowsToObjs(r.headers,r.rows);
+    }
+    STATE.dml=months.flatMap(m=>STATE.dmlByMonth[m]||[]).filter(r=>{ const t=dstr(r.Tanggal); return t>=from&&t<=to; });
+    STATE.dmlLoaded={from,to}; STATE.dmlPage=1;
     await ensureCadence();
     fillDmlKategori(); fillTopFilters(); fillLocalUnitDate();
     $("dmlControls").classList.remove("hidden"); $("dmlTable").classList.remove("hidden");
@@ -1494,28 +1587,34 @@ const act=STATE.dmlChips||{}; const bk=$("dmlBucket").value; const q=($("dmlSear
     return true;
   });
 }
+const DML_PAGE_SIZE=50;
 function renderDetail(){
   let rows=detailFiltered();
   const cad=cadenceMap(); const sk=STATE.dmlSort;
   const loOf=r=>{const c=cad[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)];return c&&c.Last_Order?dstr(c.Last_Order):"";};
-  if(sk){ const val=r=>({tgl:r.Tanggal,unit:r.Unit,dept:r.Bucket,item:r.Nama_Item||"",kat:r.Kategori||"",qty:Number(r.Qty)||0,amount:Number(r.Amount)||0,last:loOf(r)}[sk.key]);
+  if(sk){ const val=r=>({tgl:r.Tanggal,unit:r.Unit,dept:r.Bucket,item:r.Nama_Item||"",kat:r.Kategori||"",sup:String(r.Supplier||""),qty:Number(r.Qty)||0,amount:Number(r.Amount)||0,last:loOf(r)}[sk.key]);
     rows=rows.slice().sort((a,b)=>{const x=val(a),y=val(b);return (typeof x==="number"&&typeof y==="number")?sk.dir*(x-y):sk.dir*String(x).localeCompare(String(y));});
   } else rows=rows.slice().sort((a,b)=>String(a.Tanggal+a.Unit+(a.Nama_Item||"")).localeCompare(String(b.Tanggal+b.Unit+(b.Nama_Item||""))));
+  const pages=Math.max(1,Math.ceil(rows.length/DML_PAGE_SIZE));
+  STATE.dmlPage=Math.min(Math.max(1,STATE.dmlPage||1),pages);
+  const start=(STATE.dmlPage-1)*DML_PAGE_SIZE;
   const tb=$("dmlBody");
-  tb.innerHTML=rows.slice(0,600).map(r=>{
+  tb.innerHTML=rows.slice(start,start+DML_PAGE_SIZE).map(r=>{
     const raw=String(r.Flag_Raw||"");
     const isSpk=(r.Spike===true||r.Spike==="true");
     let sp = raw ? `<span class="muted" style="font-size:11px">${raw}</span>` : '\u2014';
     if(isSpk) sp=`<span class="daytag" style="background:#F2D2D2;color:#8C2F2F">SPIKE</span> `+sp;
     const amt=(r.Amount===""||r.Amount==null)?'\u2014':moneyFull(r.Amount);
     const lo=loOf(r)||'\u2014';
-    return `<tr><td>${r.Tanggal}</td><td>${r.Unit}</td><td>${r.Bucket}</td><td>${r.Nama_Item||""}</td><td>${r.Kategori||""}</td>`+
+    return `<tr><td>${r.Tanggal}</td><td>${r.Unit}</td><td>${r.Bucket}</td><td>${r.Nama_Item||""}</td><td>${r.Kategori||""}</td><td>${r.Supplier||""}</td>`+
       `<td class="rt">${fmtQty(r.Qty)}</td><td class="rt">${amt}</td><td>${lo}</td><td style="white-space:normal;min-width:200px">${sp}</td></tr>`;
-  }).join("") || '<tr><td colspan="9" class="muted">Tak ada baris cocok filter.</td></tr>';
+  }).join("") || '<tr><td colspan="10" class="muted">Tak ada baris cocok filter.</td></tr>';
   const totQty=rows.reduce((s,r)=>s+(Number(r.Qty)||0),0);
   const totAmt=rows.reduce((s,r)=>s+(Number(r.Amount)||0),0);
-  $("dmlFoot").innerHTML=rows.length?`<tr><td colspan="5" class="rt"><b>TOTAL (${rows.length} baris${rows.length>600?', tampil 600':''})</b></td><td class="rt"><b>${fmtQty(totQty)}</b></td><td class="rt"><b>${moneyFull(totAmt)}</b></td><td colspan="2"></td></tr>`:"";
-  $("dmlCount").textContent=rows.length+" baris"+(rows.length>600?" (tampil 600)":"");
+  $("dmlFoot").innerHTML=rows.length?`<tr><td colspan="6" class="rt"><b>TOTAL ${rows.length} baris</b></td><td class="rt"><b>${fmtQty(totQty)}</b></td><td class="rt"><b>${moneyFull(totAmt)}</b></td><td colspan="2"></td></tr>`:"";
+  $("dmlCount").textContent=rows.length+" baris";
+  $("dmlPageInfo").textContent="hal "+STATE.dmlPage+"/"+pages;
+  $("dmlPrev").disabled=STATE.dmlPage<=1; $("dmlNext").disabled=STATE.dmlPage>=pages;
 }
 function renderTop(){
   const all=STATE.dml||[];
@@ -1534,7 +1633,8 @@ function renderTop(){
   const items={};
   rows.forEach(r=>{ const it=r.Nama_Item||"(tanpa nama)"; const sup=(String(r.Supplier||"").trim())||"(tanpa supplier)";
     const qty=Number(r.Qty)||0, amt=Number(r.Amount)||0, hrg=Number(r.Harga)||0, t=dstr(r.Tanggal); const kat=String(r.Kategori||"");
-    const I=items[it]=items[it]||{name:it,qty:0,amt:0,kat:{},sup:{}}; I.qty+=qty; I.amt+=amt;
+    const I=items[it]=items[it]||{name:it,qty:0,amt:0,kat:{},sup:{},lastDate:""}; I.qty+=qty; I.amt+=amt;
+    if(t>I.lastDate)I.lastDate=t;
     if(kat) I.kat[kat]=(I.kat[kat]||0)+amt;
     const S=I.sup[sup]=I.sup[sup]||{name:sup,qty:0,amt:0,lastDate:"",lastPrice:null};
     S.qty+=qty; S.amt+=amt; if(t>=S.lastDate){ S.lastDate=t; S.lastPrice=hrg; } });
@@ -1544,16 +1644,16 @@ function renderTop(){
     const sups=Object.values(x.sup).sort((a,b)=>b.amt-a.amt);
     const prices=sups.map(s=>s.lastPrice).filter(p=>p!=null&&p>0);
     const minP=prices.length?Math.min(...prices):null;
-    let out=`<tr><td><b>${i+1}</b></td><td><b>${x.name}</b></td><td>${katOf(x)}</td><td></td><td></td><td class="rt"><b>${fmtQty(x.qty)}</b></td><td class="rt"><b>${moneyFull(x.amt)}</b></td></tr>`;
+    let out=`<tr><td><b>${i+1}</b></td><td><b>${x.name}</b></td><td>${katOf(x)}</td><td></td><td></td><td><b>${x.lastDate||"\u2014"}</b></td><td class="rt"><b>${fmtQty(x.qty)}</b></td><td class="rt"><b>${moneyFull(x.amt)}</b></td></tr>`;
     out+=sups.map(s=>{ let rmk="";
       if(minP!=null&&s.lastPrice!=null&&prices.length>1){
         rmk=(s.lastPrice===minP)?'<span class="rmk min">termurah</span>'
            :`<span class="rmk up">+${(((s.lastPrice-minP)/minP)*100).toFixed(0)}%</span>`; }
       const hr=(s.lastPrice!=null)?moneyFull(s.lastPrice):'\u2014';
-      return `<tr class="subrow"><td></td><td></td><td></td><td class="sup">${s.name}</td><td class="rt">${hr}${rmk}</td><td class="rt">${fmtQty(s.qty)}</td><td class="rt">${moneyFull(s.amt)}</td></tr>`;
+      return `<tr class="subrow"><td></td><td></td><td></td><td class="sup">${s.name}</td><td class="rt">${hr}${rmk}</td><td>${s.lastDate||"\u2014"}</td><td class="rt">${fmtQty(s.qty)}</td><td class="rt">${moneyFull(s.amt)}</td></tr>`;
     }).join("");
     return out;
-  }).join("")) || '<tr><td colspan="7" class="muted">Belum ada data. Klik "Muat / perbarui detail".</td></tr>';
+  }).join("")) || '<tr><td colspan="8" class="muted">Belum ada data. Klik "Muat / perbarui detail".</td></tr>';
 }
 function renderOverdue(){
   const u=$("overUnit")?$("overUnit").value:"ALL";
@@ -1573,8 +1673,8 @@ function copyDetailTSV(){
     const lo=(c&&c.Last_Order)?dstr(c.Last_Order):"";
     const amt=(r.Amount===""||r.Amount==null)?"":Math.round(Number(r.Amount)||0);
     const sp=(r.Spike===true||r.Spike==="true")?"SPIKE":"";
-    return [r.Tanggal,r.Unit,r.Bucket,r.Nama_Item||"",r.Kategori||"",Number(r.Qty)||0,amt,lo,sp].join("\t"); });
-  const head="Tanggal\tUnit\tDept\tItem\tKategori\tQty\tAmount\tOrder_Terakhir\tSpike";
+    return [r.Tanggal,r.Unit,r.Bucket,r.Nama_Item||"",r.Kategori||"",r.Supplier||"",Number(r.Qty)||0,amt,lo,sp].join("\t"); });
+  const head="Tanggal\tUnit\tDept\tItem\tKategori\tSupplier\tQty\tAmount\tOrder_Terakhir\tSpike";
   const tsv=head+"\n"+lines.join("\n");
   const done=()=>toast(lines.length+" baris tersalin");
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(tsv).then(done).catch(()=>fallbackCopy(tsv,done)); } else fallbackCopy(tsv,done);
@@ -1584,7 +1684,7 @@ async function ensureCostData(){
     $("cogsLoading").classList.remove("hidden");
     try{ const res=await getTabsBatch(["DML_Cost_Daily"]);
       ["DML_Cost_Daily"].forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
-      GRP_LOADED.cost=true; initCogsFilters();
+      GRP_LOADED.cost=true; initCogsFilters(); ensureFreshness();
     }catch(e){ $("cogsBanner").innerHTML='<div class="cogs-banner warn">Gagal memuat COGS: '+e.message+'</div>'; return; }
     finally{ $("cogsLoading").classList.add("hidden"); } }
   renderCogs();
