@@ -134,7 +134,7 @@
 
   /* ===== POPUP ===== */
   #overlay{position:fixed;inset:0;background:rgba(20,20,25,.4);display:flex;align-items:center;justify-content:center;z-index:40;padding:16px}
-  .popup{background:var(--panel);border-radius:var(--radius);max-width:560px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+  .popup{background:var(--panel);border-radius:var(--radius);max-width:800px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.2)}
   .popup-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
   .popup-head h3{font-size:14px}
   .popup-head .sub{font-size:12px;color:var(--muted);font-weight:400}
@@ -430,12 +430,18 @@
         </div>
         <div id="cogsLoading" class="cogs-loading hidden"><span class="spin"></span> Memuat data COGS…</div>
         <div id="freshBanner"></div>
+        <div class="chips" id="ctabs" style="margin:10px 0">
+          <button class="chip" data-ct="dml">DML (Purchase)</button>
+          <button class="chip" data-ct="srt">SR / Transfer</button>
+          <button class="chip active" data-ct="summary">Summary</button>
+        </div>
+        <div id="ctab-summary" class="ctab">
         <div id="cogsWarn"></div>
         <div id="cogsBanner"></div>
         <div id="cogsTotal" class="cogs-total"></div>
         <section class="section">
           <div class="sec-head"><div><div class="eyebrow">COGS #1</div><h2>Total COGS per Unit</h2></div>
-            <span class="muted" style="font-size:12px">Kitchen · Bar · Event</span></div>
+            <div class="chips" id="cvTabs"><button class="chip active" data-cv="ALL">Semua</button><button class="chip" data-cv="DML">DML</button><button class="chip" data-cv="CONS">SR/Trf</button></div></div>
           <div class="sec-body"><div class="chart-wrap" style="height:340px"><canvas id="cogsChart"></canvas></div></div>
         </section>
         <section class="section">
@@ -449,8 +455,17 @@
           <div class="sec-body" style="overflow-x:auto"><table id="cogsTable">
             <thead><tr>
               <th data-sort="unit">Unit</th><th data-sort="K">Kitchen</th><th data-sort="B">Bar</th>
-              <th data-sort="E">Event</th><th data-sort="tot">Total</th><th data-sort="revTot">Revenue</th><th data-sort="pct">Rasio%</th>
+              <th data-sort="E">Event</th><th data-sort="dmlTot">DML</th><th data-sort="cons">SR/Trf</th><th data-sort="tot">Total</th><th data-sort="revTot">Revenue</th><th data-sort="pct">Rasio%</th>
             </tr></thead><tbody id="cogsBody"></tbody></table></div>
+        </section>
+</div><!-- /ctab-summary -->
+        <div id="ctab-dml" class="ctab" style="display:none">
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">DML</div><h2>DML per Unit & Rasio</h2></div>
+            <span class="muted" style="font-size:12px">Hanya belanja DML (tanpa SR/Transfer) · klik % utk rincian</span></div>
+          <div class="sec-body" style="overflow-x:auto"><table class="daytbl">
+            <thead><tr><th>Unit</th><th class="rt">Kitchen</th><th class="rt">Bar</th><th class="rt">Event</th><th class="rt">Total DML</th><th class="rt">Revenue</th><th class="rt">Rasio%</th></tr></thead>
+            <tbody id="dmlRatioBody"></tbody></table></div>
         </section>
         <section class="section">
           <div class="sec-head"><div><div class="eyebrow">COGS #3</div><h2>Detail DML</h2></div>
@@ -510,11 +525,63 @@
             </div>
             <div id="rutBody"><span class="muted" style="font-size:13px">Klik "Muat" untuk menampilkan item rutin per unit beserta order terakhirnya.</span></div>
           </div>
+</section>
+        </div><!-- /ctab-dml -->
+
+        <div id="ctab-srt" class="ctab" style="display:none">
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">SRT #2</div><h2>Rasio per Kategori F&amp;B</h2></div>
+            <span class="muted" style="font-size:12px">Konsumsi murni (SR + transfer masuk) vs revenue F&amp;B — angka cost cocok dengan Consumption_Master; gabungan dgn DML ada di tab Summary</span></div>
+          <div class="sec-body" style="overflow-x:auto"><table id="srtRatio" class="daytbl">
+            <thead><tr><th>Unit</th><th class="rt">Cost Food</th><th class="rt">Rev. Food</th><th class="rt">Rasio F%</th><th class="rt">Cost Bev</th><th class="rt">Rev. Bev</th><th class="rt">Rasio B%</th></tr></thead>
+            <tbody id="srtRatioBody"></tbody></table></div>
         </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">SRT #3</div><h2>Top Consumption</h2></div>
+            <div class="topctrl">
+              <select id="tcUnit"><option value="ALL">Semua unit</option></select>
+              <select id="tcDept"><option value="ALL">Semua dept</option><option value="K">Kitchen</option><option value="B">Bar</option></select>
+              <select id="tcSub"><option value="ALL">Semua sub-kategori</option><option value="RAW">RAW</option><option value="FG_KITCHEN">FG Kitchen</option><option value="FG_BAKERY">FG Bakery</option></select>
+              <label class="topn">Top <input type="number" id="tcN" min="1" max="100" value="10"></label>
+            </div></div>
+          <div class="sec-body" style="overflow-x:auto"><table class="daytbl">
+            <thead><tr><th>#</th><th>Item</th><th>Sub-Kat</th><th>Dept</th><th class="rt">Qty</th><th class="rt">Amount</th><th>Terakhir</th></tr></thead>
+            <tbody id="tpcBody"></tbody></table></div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">SRT #4</div><h2>Compare Antar Unit</h2></div>
+            <div class="topctrl">
+              <button class="chip active" data-cm="kategori">Kategori</button>
+              <button class="chip" data-cm="item">Item</button>
+              <select id="cmpKat"><option value="ALL">Food + Bev</option><option value="FOOD">Food</option><option value="BEVERAGE">Beverage</option></select>
+              <input id="cmpItem" list="cmpItems" placeholder="cari item…" class="dml-search" style="display:none">
+              <datalist id="cmpItems"></datalist>
+            </div></div>
+          <div class="sec-body">
+            <div id="cmpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px"></div>
+            <div id="cmpPivotWrap" style="overflow-x:auto;margin-top:12px"></div>
+            <div class="muted" style="font-size:11px;margin-top:6px">Rasio per-item indikatif (item vs total revenue kategori), bukan pengganti rasio F/B unit-level.</div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">SRT #5</div><h2>Detail SR / Transfer</h2></div>
+            <div class="topctrl">
+              <select id="sdUnit"><option value="ALL">Semua unit</option></select>
+              <select id="sdTipe"><option value="ALL">Semua tipe</option><option>INITIAL</option><option>TRANSFER</option></select>
+              <select id="sdSub"><option value="ALL">Semua sub-kat</option><option value="RAW">RAW</option><option value="FG_KITCHEN">FG Kitchen</option><option value="FG_BAKERY">FG Bakery</option></select>
+              <input id="sdSearch" placeholder="cari item…" class="dml-search">
+            </div></div>
+          <div class="sec-body" style="overflow-x:auto"><table class="daytbl">
+            <thead><tr><th>Tanggal</th><th>Sumber</th><th>Beban</th><th>Tipe</th><th>Item</th><th>Sub-Kat</th><th>Kat</th><th class="rt">Qty</th><th class="rt">Amount</th><th>Flag</th></tr></thead>
+            <tbody id="sdBody"></tbody></table><div id="sdMore" class="muted" style="font-size:12px"></div></div>
+        </section>
+        </div><!-- /ctab-srt -->
       </div>
     </div>
   </div>
 </div>
+
+<!-- ======== POPUP ======== -->
 
 <!-- ======== POPUP ======== -->
 <div id="overlay" class="hidden">
@@ -1296,7 +1363,65 @@ function resizeRevenueCharts(){ // Chart.js bisa gepeng kalau sempat ter-hidden 
   (STATE.charts.sm||[]).forEach(c=>{try{c.resize();}catch(e){}});
 }
 const LEAD_TIME_MIN=4; // rentang < ini -> warning bias lead-time belanja
-function cogsUnitsAll(){ return [...new Set((STATE.data.DML_Cost_Daily||[]).map(r=>String(r.Unit||"").trim()).filter(Boolean))]; }
+const STORE_UNITS=["PLD","PLS","PLMT","CK","TSMB"];
+// kode unit sumber cost != kode Revenue_Master (tanpa prefix T) -> normalkan ke kode revenue
+const UNIT_ALIAS={BXC:"TBXC",SMS:"TSMS",SMB:"TSMB",PIM:"TPIM"};
+function normUnit(u){ u=String(u||"").trim(); return UNIT_ALIAS[u]||u; }
+const HIDE_UNITS=new Set(["PW","PGS"]); // data belum ada -> sembunyikan dulu
+function unitOrderIdx(u){ const dim=STATE.data.DIM_UNIT||[]; for(let k=0;k<dim.length;k++) if(String(dim[k].Unit).trim()===u) return k; return 999; }
+function unitNames(u){ const dim=STATE.data.DIM_UNIT||[];
+  return [...new Set(dim.filter(d=>String(d.Unit).trim()===u).map(d=>d.Nama_Display).filter(Boolean))].join(" / "); }
+function subKategoriOf(r){ // prefix hanya bermakna bila sumber = CK; ArtNo pasti 7 digit
+  if(String(r.Unit_Sumber||"").trim()!=="CK") return "RAW";
+  const s=String(r.ArtNo||""); if(s.length!==7) return "RAW";
+  if(s.startsWith("1119")) return "FG_KITCHEN";
+  if(s.startsWith("1120")) return "FG_BAKERY"; // BAKERY -> dept Kitchen (kategori COA FOOD)
+  return "RAW";
+}
+function consRows(){ // baris konsumsi relevan pd filter periode+unit; FOOD/BEV saja
+  const {from,to}=cogsRange(); const sel=new Set(cogsSelectedUnits());
+  return (STATE.data.Consumption_Master||[]).filter(r=>{
+    const k=String(r.Kategori||"").toUpperCase(); if(k!=="FOOD"&&k!=="BEVERAGE")return false;
+    const u=String(r.Unit_Beban||"").trim(); if(!u||!sel.has(u))return false;
+    const t=dstr(r.Tanggal); if(t<from||t>to)return false;
+    const tipe=String(r.Tipe||"").toUpperCase();
+    const fromStore=STORE_UNITS.includes(String(r.Unit_Sumber||"").trim());
+    // unit ber-store: semua baris beban-nya. unit lain: hanya TRANSFER masuk dari store.
+    return STORE_UNITS.includes(u) || (tipe==="TRANSFER"&&fromStore);
+  });
+}
+function consAgg(){ // agregat per unit + per hari + flag INCOMPLETE
+  const per={},day={},inc={};
+  consRows().forEach(r=>{
+    const u=String(r.Unit_Beban).trim(),t=dstr(r.Tanggal);
+    const d=String(r.Kategori).toUpperCase()==="BEVERAGE"?"B":"K";
+    const a=Number(r.Amount)||0;
+    (per[u]=per[u]||{K:0,B:0})[d]+=a;
+    ((day[u]=day[u]||{})[t]=day[u][t]||{K:0,B:0})[d]+=a;
+    if(String(r.Flag_Status||"").toUpperCase()==="INCOMPLETE")inc[u]=true;
+  });
+  return {per,day,inc};
+}
+function sumData(){ // GABUNGAN: COGS = DML (belanja langsung) + konsumsi SR/Transfer (store) — dua aliran terpisah, tidak dobel
+  const {from,to}=cogsRange(); const dml=cogsData(); const c=consAgg(); const U={};
+  new Set([...Object.keys(dml.U),...Object.keys(c.per)]).forEach(u=>{
+    if(HIDE_UNITS.has(u))return;
+    const cc=c.per[u]||{K:0,B:0};
+    const d=dml.U[u]||{K:0,B:0,E:0,inc:0,ind:0};
+    const K=(d.K||0)+cc.K, B=(d.B||0)+cc.B, E=d.E||0;
+    const rv=revDaysForUnit(u,from,to);
+    U[u]={unit:u,K,B,E,dmlTot:(d.K||0)+(d.B||0)+(d.E||0),cons:cc.K+cc.B,tot:K+B+E,
+      revTot:rv.revTot,revFood:rv.revFood,revBev:rv.revBev,
+      pct:rv.revTot>0?(K+B+E)/rv.revTot:null,
+      relDot:(d.inc>0?"INCOMPLETE":(d.ind>0?"INDICATIVE":"RELIABLE")),
+      incCons:!!c.inc[u]};
+  });
+  return {U,from,to,consDay:c.day};
+}
+function cogsUnitsAll(){ return [...new Set([
+  ...(STATE.data.DML_Cost_Daily||[]).map(r=>String(r.Unit||"").trim()),
+  ...(STATE.data.Consumption_Master||[]).map(r=>String(r.Unit_Beban||"").trim())
+].filter(Boolean))]; }
 function dayList(from,to){ const out=[]; let d=new Date(from+"T00:00:00Z"),e=new Date(to+"T00:00:00Z");
   while(d<=e){ out.push(d.toISOString().slice(0,10)); d.setUTCDate(d.getUTCDate()+1);} return out; }
 function rangeDays(from,to){ if(!from||!to)return 0; return Math.round((new Date(to)-new Date(from))/86400000)+1; }
@@ -1323,7 +1448,7 @@ function revDaysForUnit(unit,from,to){
     else { src=fcDay[D]||null; isFc=true; if(src)nFc++; }                                    // >batas: forecast bila ada
     if(!src) return;
     food+=src.food; bev+=src.bev; event+=src.event;
-    days.push({date:D, rev:src.food+src.bev+src.event, src:isFc?"forecast":"actual"});
+    days.push({date:D, rev:src.food+src.bev+src.event, f:src.food+src.event, b:src.bev, src:isFc?"forecast":"actual"});
   });
   return {revFood:food+event, revBev:bev, revTot:food+bev+event, nAct, nFc, lastAct, days};
 }
@@ -1351,7 +1476,27 @@ function cogsData(){
     u.relDot=u.inc>0?"INCOMPLETE":(u.ind>0?"INDICATIVE":"RELIABLE"); });
   return {U,relAmt,from,to};
 }
-function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderDayChart(); renderCogsTable(); }
+function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderDayChart(); renderCogsTable(); renderDmlRatio(); renderSrt(); }
+function renderDmlRatio(){
+  const tb=$("dmlRatioBody"); if(!tb)return;
+  const {from,to}=cogsRange(); const U=cogsData().U;
+  const rows=Object.entries(U).filter(([u])=>!HIDE_UNITS.has(u))
+    .map(([u,d])=>{ const rv=revDaysForUnit(u,from,to); const tot=(d.K||0)+(d.B||0)+(d.E||0);
+      return {u,K:d.K||0,B:d.B||0,E:d.E||0,tot,rev:rv.revTot}; })
+    .filter(r=>r.tot>0).sort((a,b)=>unitOrderIdx(a.u)-unitOrderIdx(b.u));
+  tb.innerHTML=rows.map(r=>{
+    const p=r.rev>0?`<span class="cogs-pill ${costBand(r.tot/r.rev,targetFor(r.u))} pctcell" data-unit="${r.u}">${(r.tot/r.rev*100).toFixed(1)}%</span>`:"\u2014";
+    return `<tr><td>${r.u}<div class="muted" style="font-size:10px;line-height:1.2">${unitNames(r.u)}</div></td>`+
+      `<td class="rt">${money(r.K)}</td><td class="rt">${money(r.B)}</td><td class="rt">${money(r.E)}</td>`+
+      `<td class="rt">${money(r.tot)}</td><td class="rt">${money(r.rev)}</td><td class="rt">${p}</td></tr>`; }).join("")
+    ||'<tr><td colspan="7" class="muted">Tak ada data pada filter ini.</td></tr>';
+}
+function methodBadge(u){
+  if(u.method==="KONSUMSI") return '<span class="daytag" style="background:#D7E4D0;color:#2F5E2F" title="COGS dari data konsumsi (SR+Transfer)">Konsumsi</span>';
+  const t=u.fallback?"Purchase — fallback, data konsumsi belum tersedia":"Purchase (DML+transfer store) — estimasi";
+  return `<span class="daytag" style="background:#EFE3C4;color:#7A5E14" title="${t}">Purchase</span>`;
+}
+function incBadge(u){ return u.incCons?'<span class="daytag" style="background:#F2D2D2;color:#8C2F2F" title="Ada baris konsumsi Flag_Status=INCOMPLETE pada periode ini">INC</span>':""; }
 /* ===== Chart cost harian vs revenue (dual axis) ===== */
 function renderDayChart(){
   const ctx=$("cogsDayChart"); if(!ctx)return;
@@ -1364,16 +1509,29 @@ function renderDayChart(){
   units.forEach(u=>{ revDaysForUnit(u,from,to).days.forEach(d=>{ rev[d.date]=(rev[d.date]||0)+d.rev;
     if(d.src==="forecast")fcDay[d.date]=true; }); });
   const labels=dayList(from,to);
+  // konsumsi harian + gabungan sesuai metode per unit (utk mode ALL)
+  const sd=sumData(); const selH=new Set(units.filter(u=>!HIDE_UNITS.has(u)));
+  const consD={}; Object.entries(sd.consDay||{}).forEach(([u,days])=>{ if(!selH.has(u))return;
+    Object.entries(days).forEach(([t,v])=>{ if(t<from||t>to)return; consD[t]=(consD[t]||0)+v.K+v.B; }); });
+  const dmlUD={}; (STATE.data.DML_Cost_Daily||[]).forEach(r=>{ const u=String(r.Unit||"").trim(); if(!selH.has(u))return;
+    const t=dstr(r.Tanggal); if(t<from||t>to)return; ((dmlUD[u]=dmlUD[u]||{})[t]=(dmlUD[u][t]||0)+(Number(r.Amount)||0)); });
+  const usedD={}; selH.forEach(u=>{ const cd=(sd.consDay||{})[u]||{}; const dd=dmlUD[u]||{};
+    new Set([...Object.keys(cd),...Object.keys(dd)]).forEach(t=>{ if(t<from||t>to)return;
+      usedD[t]=(usedD[t]||0)+(cd[t]?cd[t].K+cd[t].B:0)+(dd[t]||0); }); });
+  const v=STATE.cogsView||"ALL";
+  const barD=v==="DML"?cost:(v==="CONS"?consD:usedD);
+  const barLab=v==="DML"?"Cost (DML)":(v==="CONS"?"Cost (SR/Trf)":"Cost (DML + SR/Trf)");
   if(STATE.charts.cogsDay)STATE.charts.cogsDay.destroy();
   STATE.charts.cogsDay=new Chart(ctx,{data:{labels,datasets:[
-    {type:"bar",label:"Cost (DML)",yAxisID:"y",data:labels.map(t=>cost[t]||0),backgroundColor:getCSS("--navy")},
+    {type:"bar",label:barLab,yAxisID:"y",data:labels.map(t=>barD[t]||0),backgroundColor:getCSS("--navy")+"80"},
     {type:"line",label:"Revenue",yAxisID:"y2",data:labels.map(t=>rev[t]||0),borderColor:getCSS("--we"),
       pointRadius:2,tension:.2,segment:{borderDash:c=>fcDay[labels[c.p1DataIndex]]?[5,4]:undefined}}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:"bottom"},tooltip:{callbacks:{
         label:c=>c.dataset.label+": "+fmt(c.parsed.y),
-        afterBody:it=>{ const t=labels[it[0].dataIndex]; const cv=cost[t]||0,rv=rev[t]||0;
-          return rv>0?["Ratio hari ini: "+(cv/rv*100).toFixed(1)+"%"]:[]; }}}},
+        afterBody:it=>{ const t=labels[it[0].dataIndex]; const cv=(barD[t]||0),rv=rev[t]||0;
+          const out=["DML: "+fmt(cost[t]||0),"SR/Trf: "+fmt(consD[t]||0)];
+          if(rv>0)out.push("Ratio hari ini: "+(cv/rv*100).toFixed(1)+"%"); return out; }}}},
       scales:{y:{position:"left",title:{display:true,text:"Cost"},ticks:{callback:v=>fmt(v)}},
         y2:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Revenue"},ticks:{callback:v=>fmt(v)}},
         x:{ticks:{maxRotation:60,callback:function(v){return this.getLabelForValue(v).slice(8,10);}}}}}});
@@ -1425,14 +1583,18 @@ function renderCogsWarn(){ const {from,to}=cogsRange(); const days=rangeDays(fro
 function renderCogsBanner(){ const {relAmt}=cogsData(); const tot=(relAmt.RELIABLE||0)+(relAmt.INDICATIVE||0)+(relAmt.INCOMPLETE||0);
   const ind=tot>0?Math.round((relAmt.INDICATIVE||0)/tot*100):0;
   const tip="Sebagian nilai ("+ind+"%) masih estimasi dari catatan belanja (LOG), belum dicocokkan dengan order final. Angka bisa berubah setelah verifikasi.";
-  $("cogsBanner").innerHTML=`<div class="cogs-banner warn">COGS ini dari data belanja harian (DML) \u2014 belum termasuk pengambilan store & transfer antar unit. Sebagian nilai masih estimasi, belum dicek final. <span class="infodot" title="${tip}">\u24d8</span></div>`; }
-function renderCogsTotal(){ const {U}=cogsData(); const inclCK=$("cogsInclCK").checked;
+  $("cogsBanner").innerHTML=`<div class="cogs-banner warn">COGS = belanja langsung (DML) + konsumsi store (SR/Transfer) \u2014 dua aliran terpisah. Sebagian nilai DML masih estimasi, belum dicek final. <span class="infodot" title="${tip}">\u24d8</span></div>`; }
+function renderCogsTotal(){ const {U}=sumData(); const inclCK=$("cogsInclCK").checked;
   let cogs=0,rev=0; Object.values(U).forEach(u=>{ if(u.unit==="CK"&&!inclCK)return; cogs+=u.tot; rev+=u.revTot; });
   const ratio=rev>0?cogs/rev:null; const band=ratio==null?"cp-none":costBand(ratio, STATE.cogsSlider!=null?STATE.cogsSlider:0.20);
   $("cogsTotal").innerHTML=`<div class="ct-card"><span class="ct-lab">Total COGS</span><b>${money(cogs)}</b></div>`+
     `<div class="ct-card"><span class="ct-lab">Revenue (denominator)</span><b>${money(rev)}</b></div>`+
     `<div class="ct-card"><span class="ct-lab">Rasio all-unit${inclCK?" (incl CK)":""}</span><span class="cogs-pill ${band}">${pct(ratio)}</span></div>`; }
-function renderCogsChart(){ const {U}=cogsData(); const rows=Object.values(U).sort((a,b)=>b.tot-a.tot); const ctx=$("cogsChart"); if(!ctx)return;
+function viewRows(){ const v=STATE.cogsView||"ALL";
+  if(v==="DML"){ const U=cogsData().U; return Object.entries(U).filter(([u])=>!HIDE_UNITS.has(u)).map(([u,d])=>({unit:u,K:d.K,B:d.B,E:d.E,tot:d.K+d.B+d.E})); }
+  if(v==="CONS"){ const per=consAgg().per; return Object.entries(per).filter(([u])=>!HIDE_UNITS.has(u)).map(([u,c])=>({unit:u,K:c.K,B:c.B,E:0,tot:c.K+c.B})); }
+  return Object.values(sumData().U); }
+function renderCogsChart(){ const rows=viewRows().filter(r=>r.tot>0).sort((a,b)=>unitOrderIdx(a.unit)-unitOrderIdx(b.unit)); const ctx=$("cogsChart"); if(!ctx)return;
   if(STATE.charts.cogs)STATE.charts.cogs.destroy();
   STATE.charts.cogs=new Chart(ctx,{type:"bar",data:{labels:rows.map(r=>r.unit),datasets:[
     {label:"Kitchen",data:rows.map(r=>r.K),backgroundColor:getCSS("--navy")},
@@ -1441,17 +1603,18 @@ function renderCogsChart(){ const {U}=cogsData(); const rows=Object.values(U).so
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},
       tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.parsed.y)}}},
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}}); }
-function renderCogsTable(){ const {U}=cogsData(); let rows=Object.values(U);
-  const sk=STATE.cogsSort||{key:"tot",dir:-1};
-  rows.sort((a,b)=>{ if(sk.key==="unit")return sk.dir*String(a.unit).localeCompare(String(b.unit)); return sk.dir*(((a[sk.key])||0)-((b[sk.key])||0)); });
+function renderCogsTable(){ const {U}=sumData(); let rows=Object.values(U);
+  const sk=STATE.cogsSort||{key:"ord",dir:1};
+  rows.sort((a,b)=>{ if(sk.key==="ord")return sk.dir*(unitOrderIdx(a.unit)-unitOrderIdx(b.unit));
+    if(sk.key==="unit")return sk.dir*String(a.unit).localeCompare(String(b.unit)); return sk.dir*(((a[sk.key])||0)-((b[sk.key])||0)); });
   const tb=$("cogsBody"); tb.innerHTML="";
   rows.forEach(u=>{ const isCK=(u.revTot<=0);
     const pcell=u.pct==null?"\u2014":`<span class="cogs-pill ${costBand(u.pct,targetFor(u.unit))} pctcell" data-unit="${u.unit}">${pct(u.pct)}</span>`;
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td><span class="rel-dot rel-${u.relDot}"></span> ${u.unit}${isCK?' <span class="muted" style="font-size:11px">(no rev)</span>':''}</td>`+
-      `<td>${money(u.K)}</td><td>${money(u.B)}</td><td>${money(u.E)}</td><td>${money(u.tot)}</td><td>${money(u.revTot)}</td><td>${pcell}</td>`;
+    tr.innerHTML=`<td><span class="rel-dot rel-${u.relDot}"></span> ${u.unit}${incBadge(u)}${isCK?' <span class="muted" style="font-size:11px">(no rev)</span>':''}<div class="muted" style="font-size:10px;line-height:1.2">${unitNames(u.unit)}</div></td>`+
+      `<td>${money(u.K)}</td><td>${money(u.B)}</td><td>${money(u.E)}</td><td>${money(u.dmlTot)}</td><td>${money(u.cons)}</td><td>${money(u.tot)}</td><td>${money(u.revTot)}</td><td>${pcell}</td>`;
     tb.appendChild(tr); });
-  if(!rows.length) tb.innerHTML='<tr><td colspan="7" class="muted">Tak ada data pada filter ini.</td></tr>'; }
+  if(!rows.length) tb.innerHTML='<tr><td colspan="9" class="muted">Tak ada data pada filter ini.</td></tr>'; }
 function showDayPopup(unit){
   const {from,to}=cogsRange();
   const cd=STATE.data.DML_Cost_Daily||[]; const cday={};
@@ -1459,18 +1622,53 @@ function showDayPopup(unit){
     const b=String(r.Bucket||"").toUpperCase(); (cday[t]=cday[t]||{K:0,B:0,E:0}); const a=Number(r.Amount)||0;
     if(b==="KITCHEN")cday[t].K+=a; else if(b==="BAR")cday[t].B+=a; else if(b==="EVENT")cday[t].E+=a; });
   const rv=revDaysForUnit(unit,from,to); const revMap={}; rv.days.forEach(d=>revMap[d.date]={rev:d.rev,src:d.src});
-  const dates=[...new Set([...Object.keys(cday),...Object.keys(revMap)])].sort();
+  const cons=(sumData().consDay||{})[unit]||{};
+  const dates=[...new Set([...Object.keys(cday),...Object.keys(revMap),...Object.keys(cons)])].sort();
   openOverlay("Rincian harian "+unit, from+" s/d "+to+" \u00b7 ratio harian bisa bias \u2014 belanja hari ini utk stok beberapa hari");
+  const tgt=targetFor(unit);
+  const rpill=(cost,rev)=>{ if(rev<=0)return"\u2014"; const p=cost/rev;
+    return `<span class="cogs-pill ${costBand(p,tgt)}">${(p*100).toFixed(1)}%</span>`; };
   let rows=dates.map(t=>{ const c=cday[t]||{K:0,B:0,E:0}; const rm=revMap[t]||{rev:0,src:""};
     const tag=rm.src?`<span class="daytag ${rm.src}">${rm.src}</span>`:"";
-    const ct=c.K+c.B+c.E; const rt=rm.rev>0?(ct/rm.rev*100).toFixed(1)+"%":"\u2014";
+    const cn=cons[t]?(cons[t].K+cons[t].B):0; const dt=c.K+c.B+c.E;
+    const ct=dt+cn;
     return `<tr><td>${t}</td><td class="rt">${moneyFull(c.K)}</td><td class="rt">${moneyFull(c.B)}</td>`+
-      `<td class="rt">${moneyFull(c.E)}</td><td class="rt">${moneyFull(rm.rev)}</td><td class="rt">${rt}</td><td>${tag}</td></tr>`; }).join("");
-  if(!dates.length) rows='<tr><td colspan="7" class="muted">Tak ada data pada periode ini.</td></tr>';
-  $("puBody").innerHTML=`<table class="daytbl"><thead><tr><th>Tanggal</th><th class="rt">Kitchen</th><th class="rt">Bar</th>`+
-    `<th class="rt">Event</th><th class="rt">Revenue</th><th class="rt" title="Cost harian \u00f7 revenue harian">Ratio</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+      `<td class="rt">${moneyFull(c.E)}</td><td class="rt">${moneyFull(cn)}</td><td class="rt">${moneyFull(rm.rev)}</td>`+
+      `<td class="rt">${rpill(dt,rm.rev)}</td><td class="rt">${rpill(ct,rm.rev)}</td><td>${tag}</td></tr>`; }).join("");
+  if(!dates.length) rows='<tr><td colspan="9" class="muted">Tak ada data pada periode ini.</td></tr>';
+  $("puBody").innerHTML=`<table class="daytbl"><thead><tr><th>Tanggal</th><th class="rt">DML K</th><th class="rt">DML B</th>`+
+    `<th class="rt">DML E</th><th class="rt">Konsumsi</th><th class="rt">Revenue</th><th class="rt" title="Cost DML \u00f7 revenue">R. DML</th>`+
+    `<th class="rt" title="(DML + SR/Trf) \u00f7 revenue">Ratio</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-document.addEventListener("click",e=>{ const el=e.target.closest(".pctcell"); if(el){ e.stopPropagation(); showDayPopup(el.dataset.unit); } });
+document.addEventListener("click",e=>{ const el=e.target.closest(".pctcell"); if(el){ e.stopPropagation(); showDayPopup(el.dataset.unit); return; }
+  const ec=e.target.closest(".conscell"); if(ec){ e.stopPropagation(); showConsPopup(ec.dataset.unit); } });
+function showConsPopup(unit){
+  const {from,to}=cogsRange(); const D={};
+  consRows().forEach(r=>{ if(String(r.Unit_Beban).trim()!==unit)return;
+    const t=dstr(r.Tanggal); const a=Number(r.Amount)||0;
+    const d=(D[t]=D[t]||{fd:0,fgk:0,fgb:0,bev:0,trf:0,ini:0});
+    if(String(r.Kategori).toUpperCase()==="BEVERAGE")d.bev+=a;
+    else { const sk=subKategoriOf(r); if(sk==="FG_KITCHEN")d.fgk+=a; else if(sk==="FG_BAKERY")d.fgb+=a; else d.fd+=a; }
+    if(String(r.Tipe||"").toUpperCase()==="TRANSFER")d.trf+=a; else d.ini+=a; });
+  const rv=revDaysForUnit(unit,from,to); const rm={}; rv.days.forEach(d=>rm[d.date]={fb:(d.f||0)+(d.b||0),src:d.src});
+  const dates=[...new Set([...Object.keys(D),...Object.keys(rm)])].sort().filter(t=>D[t]); // hanya hari ada konsumsi
+  const tgt=targetFor(unit);
+  openOverlay("Konsumsi harian "+unit, from+" s/d "+to+" \u00b7 Food = RAW food; FG = olahan CK \u00b7 Transfer vs pengambilan store sendiri");
+  let tf=0,tfgk=0,tfgb=0,tb2=0,ttrf=0,tini=0,trev=0;
+  let rows=dates.map(t=>{ const d=D[t]; const fb=(rm[t]||{}).fb||0; const tot=d.fd+d.fgk+d.fgb+d.bev;
+    tf+=d.fd;tfgk+=d.fgk;tfgb+=d.fgb;tb2+=d.bev;ttrf+=d.trf;tini+=d.ini;trev+=fb;
+    const p=fb>0?`<span class="cogs-pill ${costBand(tot/fb,tgt)}">${(tot/fb*100).toFixed(1)}%</span>`:"\u2014";
+    return `<tr><td>${t}</td><td class="rt">${moneyFull(d.fd)}</td><td class="rt">${moneyFull(d.fgk)}</td><td class="rt">${moneyFull(d.fgb)}</td>`+
+      `<td class="rt">${moneyFull(d.bev)}</td><td class="rt">${moneyFull(d.trf)}</td><td class="rt">${moneyFull(d.ini)}</td>`+
+      `<td class="rt">${moneyFull(fb)}</td><td class="rt">${p}</td></tr>`; }).join("");
+  if(!dates.length) rows='<tr><td colspan="9" class="muted">Tak ada konsumsi pada periode ini.</td></tr>';
+  else { const ttot=tf+tfgk+tfgb+tb2;
+    const tp=trev>0?`<span class="cogs-pill ${costBand(ttot/trev,tgt)}">${(ttot/trev*100).toFixed(1)}%</span>`:"\u2014";
+    rows+=`<tr style="font-weight:700;border-top:2px solid var(--line)"><td>Total</td><td class="rt">${moneyFull(tf)}</td><td class="rt">${moneyFull(tfgk)}</td><td class="rt">${moneyFull(tfgb)}</td>`+
+      `<td class="rt">${moneyFull(tb2)}</td><td class="rt">${moneyFull(ttrf)}</td><td class="rt">${moneyFull(tini)}</td><td class="rt">${moneyFull(trev)}</td><td class="rt">${tp}</td></tr>`; }
+  $("puBody").innerHTML=`<table class="daytbl"><thead><tr><th>Tanggal</th><th class="rt">Food</th><th class="rt">FG Kitchen</th><th class="rt">FG Bakery</th>`+
+    `<th class="rt">Beverage</th><th class="rt" title="Tipe TRANSFER (dari store lain)">Transfer</th><th class="rt" title="Tipe INITIAL (pengambilan store sendiri)">Unit Sendiri</th>`+
+    `<th class="rt">Rev F&B</th><th class="rt">Ratio</th></tr></thead><tbody>${rows}</tbody></table>`; }
 function initCogsFilters(){
   const dim=STATE.data.DIM_UNIT||[]; const units=cogsUnitsAll(); const grpOf={}; dim.forEach(d=>{ grpOf[String(d.Unit).trim()]=d.Grup||""; });
   const clusters=[...new Set(units.map(u=>grpOf[u]).filter(Boolean))].sort();
@@ -1497,6 +1695,19 @@ function initCogsFilters(){
   // ---- C-2 wiring ----
   STATE.dmlChips={}; STATE.topMode="item";
   $("dmlLoad").onclick=loadDMLDetail;
+  ["tcUnit","tcDept","tcSub","tcN"].forEach(id=>{ const e=$(id); if(e)e.onchange=renderTopCons; });
+  ["sdUnit","sdTipe","sdSub"].forEach(id=>{ const e=$(id); if(e)e.onchange=renderSrtDetail; });
+  let _sdT; if($("sdSearch"))$("sdSearch").oninput=()=>{clearTimeout(_sdT);_sdT=setTimeout(renderSrtDetail,250);};
+  document.querySelectorAll("[data-cm]").forEach(b=>b.onclick=()=>{
+    STATE.cmpMode=b.dataset.cm;
+    document.querySelectorAll("[data-cm]").forEach(x=>x.classList.toggle("active",x===b));
+    $("cmpItem").style.display=b.dataset.cm==="item"?"":"none"; renderCmp(); });
+  let _cmT; if($("cmpItem"))$("cmpItem").oninput=()=>{clearTimeout(_cmT);_cmT=setTimeout(renderCmp,350);};
+  if($("cmpKat"))$("cmpKat").onchange=renderCmp;
+  document.querySelectorAll("#cvTabs .chip").forEach(b=>b.onclick=()=>{
+    STATE.cogsView=b.dataset.cv;
+    document.querySelectorAll("#cvTabs .chip").forEach(x=>x.classList.toggle("active",x===b));
+    renderCogsChart(); renderDayChart(); });
   document.querySelectorAll("#grp-cost .chip[data-f]").forEach(ch=>ch.onclick=()=>{ const f=ch.dataset.f;
     STATE.dmlChips[f]=!STATE.dmlChips[f]; ch.classList.toggle("active",STATE.dmlChips[f]); if(STATE.dml)renderDetail(); });
 $("dmlBucket").onchange=()=>{ if(STATE.dml)renderDetail(); };
@@ -1551,13 +1762,14 @@ async function loadDMLDetail(){
   $("dmlTable").classList.add("hidden"); $("dmlControls").classList.add("hidden");
   try{
     const curM=(STATE.lastActualDate||"").slice(0,7);
-    const months=monthsBetween(from,to);
+    const months=monthsBetween(from,to); const failed=[];
     for(const m of months){
       if(STATE.dmlByMonth[m] && m!==curM) continue;           // cache bulan lampau; bulan berjalan selalu segar
       const r=await api({action:"getDMLDetail",token:STATE.token,from:m+"-01",to:monthEnd(m),units:cogsUnitsAll()});
-      if(!r.ok){ toast("Gagal bulan "+m+": "+(r.error||"?")); if(!STATE.dmlByMonth[m])STATE.dmlByMonth[m]=[]; continue; }
+      if(!r.ok){ failed.push(m); delete STATE.dmlByMonth[m]; continue; }   // JANGAN cache bulan gagal
       STATE.dmlByMonth[m]=rowsToObjs(r.headers,r.rows);
     }
+    STATE.dmlFailed=failed;
     STATE.dml=months.flatMap(m=>STATE.dmlByMonth[m]||[]).filter(r=>{ const t=dstr(r.Tanggal); return t>=from&&t<=to; });
     STATE.dmlLoaded={from,to}; STATE.dmlPage=1;
     await ensureCadence();
@@ -1612,7 +1824,8 @@ function renderDetail(){
   const totQty=rows.reduce((s,r)=>s+(Number(r.Qty)||0),0);
   const totAmt=rows.reduce((s,r)=>s+(Number(r.Amount)||0),0);
   $("dmlFoot").innerHTML=rows.length?`<tr><td colspan="6" class="rt"><b>TOTAL ${rows.length} baris</b></td><td class="rt"><b>${fmtQty(totQty)}</b></td><td class="rt"><b>${moneyFull(totAmt)}</b></td><td colspan="2"></td></tr>`:"";
-  $("dmlCount").textContent=rows.length+" baris";
+  const fl=(STATE.dmlFailed||[]);
+  $("dmlCount").innerHTML=rows.length+" baris"+(fl.length?` <span style="color:#8C2F2F">\u00b7 \u26a0 gagal muat: ${fl.join(", ")} \u2014 data bulan itu TIDAK termasuk, klik "Muat" ulang</span>`:"");
   $("dmlPageInfo").textContent="hal "+STATE.dmlPage+"/"+pages;
   $("dmlPrev").disabled=STATE.dmlPage<=1; $("dmlNext").disabled=STATE.dmlPage>=pages;
 }
@@ -1679,17 +1892,147 @@ function copyDetailTSV(){
   const done=()=>toast(lines.length+" baris tersalin");
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(tsv).then(done).catch(()=>fallbackCopy(tsv,done)); } else fallbackCopy(tsv,done);
 }
+/* ===== TAB SR/TRANSFER ===== */
+function srtUnits(){ return cogsSelectedUnits(); }
+function renderSrt(){ if($("ctab-srt").style.display==="none")return;
+  renderSrtRatio(); renderTopCons(); renderCmp(); renderSrtDetail(); fillSrtSelects(); }
+function fillSrtSelects(){
+  const us=srtUnits();
+  ["tcUnit","sdUnit"].forEach(id=>{ const s=$(id); if(!s)return; const c=s.value;
+    s.innerHTML='<option value="ALL">Semua unit</option>'+us.map(u=>`<option>${u}</option>`).join("");
+    if([...s.options].some(o=>o.value===c))s.value=c; });
+  const items=[...new Set(consRows().map(r=>String(r.Description||"").trim()).filter(Boolean))].sort();
+  $("cmpItems").innerHTML=items.slice(0,800).map(i=>`<option value="${i.replace(/"/g,'&quot;')}">`).join("");
+}
+function renderSrtRatio(){
+  // KONSUMSI MURNI (cocok 1:1 dgn sheet Consumption_Master per Unit_Beban).
+  // Campuran DML+konsumsi hanya di tab Summary (Keputusan 2/3).
+  const {from,to}=cogsRange(); const c=consAgg(); const tb=$("srtRatioBody"); if(!tb)return;
+  const rows=cogsSelectedUnits().map(u=>{
+    const cc=c.per[u]||{K:0,B:0};
+    const rv=revDaysForUnit(u,from,to);
+    return {u,F:cc.K,B:cc.B,rf:rv.revFood,rb:rv.revBev,inc:!!c.inc[u]};
+  }).filter(r=>(r.F+r.B)>0&&!HIDE_UNITS.has(r.u)).sort((a,b)=>unitOrderIdx(a.u)-unitOrderIdx(b.u));
+  const pill=(cost,rev,u)=>{ if(rev<=0)return"\u2014"; const p=cost/rev;
+    return `<span class="cogs-pill ${costBand(p,targetFor(u))} conscell" data-unit="${u}">${(p*100).toFixed(1)}%</span>`; };
+  tb.innerHTML=rows.map(r=>
+    `<tr><td>${r.u}${r.inc?' <span class="daytag" style="background:#F2D2D2;color:#8C2F2F" title="Ada baris konsumsi INCOMPLETE">INC</span>':''}<div class="muted" style="font-size:10px;line-height:1.2">${unitNames(r.u)}</div></td><td class="rt">${money(r.F)}</td><td class="rt">${money(r.rf)}</td><td class="rt">${pill(r.F,r.rf,r.u)}</td>`+
+    `<td class="rt">${money(r.B)}</td><td class="rt">${money(r.rb)}</td><td class="rt">${pill(r.B,r.rb,r.u)}</td></tr>`).join("")
+    ||'<tr><td colspan="7" class="muted">Tak ada data pada filter ini.</td></tr>';
+}
+function renderTopCons(){
+  const tb=$("tpcBody"); if(!tb)return;
+  const fu=$("tcUnit").value,fd=$("tcDept").value,fs=$("tcSub").value,n=Math.max(1,Math.min(100,parseInt($("tcN").value)||10));
+  const agg={};
+  consRows().forEach(r=>{ const u=String(r.Unit_Beban).trim();
+    if(fu!=="ALL"&&u!==fu)return;
+    const d=String(r.Kategori).toUpperCase()==="BEVERAGE"?"B":"K"; if(fd!=="ALL"&&d!==fd)return;
+    const sk=subKategoriOf(r); if(fs!=="ALL"&&sk!==fs)return;
+    const k=String(r.ArtNo)+"|"+sk;
+    (agg[k]=agg[k]||{item:r.Description,sk,d,qty:0,amt:0,last:""});
+    agg[k].qty+=Number(r.Qty)||0; agg[k].amt+=Number(r.Amount)||0;
+    const t=dstr(r.Tanggal); if(t>agg[k].last)agg[k].last=t; });
+  const rows=Object.values(agg).sort((a,b)=>b.amt-a.amt).slice(0,n);
+  const SK={RAW:"RAW",FG_KITCHEN:"FG Kitchen",FG_BAKERY:"FG Bakery"};
+  tb.innerHTML=rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.item}</td><td>${SK[r.sk]}</td><td>${r.d==="B"?"Bar":"Kitchen"}</td>`+
+    `<td class="rt">${fmt(r.qty)}</td><td class="rt">${money(r.amt)}</td><td>${r.last}</td></tr>`).join("")
+    ||'<tr><td colspan="7" class="muted">Tak ada data.</td></tr>';
+}
+function renderCmp(){
+  const mode=STATE.cmpMode||"kategori"; const grid=$("cmpGrid"),pw=$("cmpPivotWrap"); if(!grid)return;
+  (STATE.charts.cmp||[]).forEach(c=>{try{c.destroy();}catch(e){}}); STATE.charts.cmp=[];
+  grid.innerHTML=""; pw.innerHTML="";
+  const {from,to}=cogsRange(); const labels=dayList(from,to); const us=srtUnits();
+  const kat=($("cmpKat")&&$("cmpKat").value)||"ALL";
+  if(mode==="kategori"){
+    const num=[];
+    us.forEach(u=>{
+      if(HIDE_UNITS.has(u))return;
+      let K=0,B=0;
+      consRows().forEach(r=>{ if(String(r.Unit_Beban).trim()!==u)return;
+        const KT=String(r.Kategori).toUpperCase(); if(kat!=="ALL"&&KT!==kat)return;
+        if(KT==="BEVERAGE")B+=(Number(r.Amount)||0); else K+=(Number(r.Amount)||0); });
+      const rv=revDaysForUnit(u,from,to);
+      const den=kat==="FOOD"?rv.revFood:(kat==="BEVERAGE"?rv.revBev:(rv.revFood+rv.revBev));
+      num.push({u,K,B,amt:K+B,den,pct:den>0?(K+B)/den:null});
+    });
+    num.sort((a,b)=>b.amt-a.amt);
+    const withAmt=num.filter(r=>r.amt>0);
+    grid.style.display="block";
+    grid.innerHTML=`<div style="height:${Math.max(160,withAmt.length*30+40)}px"><canvas></canvas></div>`;
+    STATE.charts.cmp.push(new Chart(grid.querySelector("canvas"),{type:"bar",
+      data:{labels:withAmt.map(r=>r.u),datasets:[
+        {label:"Kitchen (Food)",data:withAmt.map(r=>r.K),backgroundColor:getCSS("--navy")+"CC",stack:"c"},
+        {label:"Bar (Bev)",data:withAmt.map(r=>r.B),backgroundColor:getCSS("--we")+"CC",stack:"c"}]},
+      options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:"bottom"},tooltip:{callbacks:{
+          label:c=>c.dataset.label+": "+fmt(c.parsed.x),
+          afterBody:it=>{ const r=withAmt[it[0].dataIndex];
+            return r.pct==null?[]:["% dari revenue: "+(r.pct*100).toFixed(1)+"%"]; }}}},
+        scales:{x:{stacked:true,ticks:{callback:v=>fmt(v)}},y:{stacked:true}}}}));
+    pw.innerHTML='<table class="daytbl"><thead><tr><th>Unit</th><th class="rt">Amount</th><th class="rt">Rev. '+(kat==="ALL"?"F&B":kat)+'</th><th class="rt">% Rev</th></tr></thead><tbody>'+
+      num.map(r=>`<tr><td>${r.u}</td><td class="rt">${money(r.amt)}</td><td class="rt">${money(r.den)}</td><td class="rt">${r.pct==null?"\u2014":(r.pct*100).toFixed(1)+"%"}</td></tr>`).join("")+"</tbody></table>"+
+      '<div class="muted" style="font-size:11px">Qty tidak dijumlah di mode Kategori (satuan campur) \u2014 lihat mode Item. Unit non-store: angka = transfer masuk dari store saja, bukan cost total.</div>';
+    return;
+  }
+  const item=($("cmpItem").value||"").trim(); if(!item){ grid.style.display="block"; grid.innerHTML='<span class="muted" style="font-size:13px">Ketik/pilih item untuk membandingkan.</span>'; return; }
+  const rows=consRows().filter(r=>String(r.Description||"").trim()===item);
+  const per={};
+  rows.forEach(r=>{ const u=String(r.Unit_Beban).trim(); if(HIDE_UNITS.has(u))return;
+    (per[u]=per[u]||{amt:0,qty:0,kat:String(r.Kategori).toUpperCase()});
+    per[u].amt+=Number(r.Amount)||0; per[u].qty+=Number(r.Qty)||0; });
+  const iu=us.filter(u=>per[u]).sort((a,b)=>per[b].amt-per[a].amt);
+  grid.style.display="block";
+  grid.innerHTML=`<div style="height:${Math.max(140,iu.length*30+40)}px"><canvas></canvas></div>`;
+  STATE.charts.cmp.push(new Chart(grid.querySelector("canvas"),{type:"bar",
+    data:{labels:iu,datasets:[{label:item,data:iu.map(u=>per[u].amt),backgroundColor:getCSS("--navy")+"CC"}]},
+    options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{callback:v=>fmt(v)}}}}}));
+  pw.innerHTML='<table class="daytbl"><thead><tr><th>Unit</th><th class="rt">Qty</th><th class="rt">Amount</th><th class="rt">Rev. kategori</th><th class="rt">% Rev</th></tr></thead><tbody>'+
+    us.filter(u=>per[u]).map(u=>{ const p=per[u]; const rv=revDaysForUnit(u,from,to);
+      const den=p.kat==="BEVERAGE"?rv.revBev:rv.revFood;
+      return `<tr><td>${u}</td><td class="rt">${fmt(p.qty)}</td><td class="rt">${money(p.amt)}</td><td class="rt">${money(den)}</td><td class="rt">${den>0?(p.amt/den*100).toFixed(2)+"%":"\u2014"}</td></tr>`; }).join("")+"</tbody></table>";
+}
+function renderSrtDetail(){
+  const tb=$("sdBody"); if(!tb)return;
+  const fu=$("sdUnit").value,ft=$("sdTipe").value,fs=$("sdSub").value,q=($("sdSearch").value||"").toLowerCase();
+  const SK={RAW:"RAW",FG_KITCHEN:"FG Kitchen",FG_BAKERY:"FG Bakery"};
+  const rows=consRows().filter(r=>{
+    if(fu!=="ALL"&&String(r.Unit_Beban).trim()!==fu)return false;
+    if(ft!=="ALL"&&String(r.Tipe||"").toUpperCase()!==ft)return false;
+    const sk=subKategoriOf(r); if(fs!=="ALL"&&sk!==fs)return false;
+    if(q&&!String(r.Description||"").toLowerCase().includes(q))return false;
+    return true; }).sort((a,b)=>dstr(b.Tanggal).localeCompare(dstr(a.Tanggal)));
+  const SHOW=300;
+  tb.innerHTML=rows.slice(0,SHOW).map(r=>{ const fl=String(r.Flag_Status||"").toUpperCase();
+    const flc=fl==="INCOMPLETE"?'style="background:#F2D2D2;color:#8C2F2F"':(fl==="OK"?"":'style="background:#EFE3C4;color:#7A5E14"');
+    return `<tr><td>${dstr(r.Tanggal)}</td><td>${r.Unit_Sumber||""}</td><td>${r.Unit_Beban}</td><td>${r.Tipe}</td>`+
+      `<td>${r.Description||""}</td><td>${SK[subKategoriOf(r)]}</td><td>${r.Kategori}</td>`+
+      `<td class="rt">${fmt(Number(r.Qty)||0)}</td><td class="rt">${money(Number(r.Amount)||0)}</td>`+
+      `<td><span class="daytag" ${flc}>${fl||"\u2014"}</span></td></tr>`; }).join("")
+    ||'<tr><td colspan="10" class="muted">Tak ada data pada filter ini.</td></tr>';
+  $("sdMore").textContent=rows.length>SHOW?`Menampilkan ${SHOW} dari ${rows.length} baris — persempit filter.`:"";
+}
 async function ensureCostData(){
   if(!GRP_LOADED.cost){
     $("cogsLoading").classList.remove("hidden");
-    try{ const res=await getTabsBatch(["DML_Cost_Daily"]);
-      ["DML_Cost_Daily"].forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
+try{ const need=["DML_Cost_Daily","Consumption_Master"];
+      const res=await getTabsBatch(need);
+      need.forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
+      (STATE.data.DML_Cost_Daily||[]).forEach(r=>r.Unit=normUnit(r.Unit));
+      (STATE.data.Consumption_Master||[]).forEach(r=>{ r.Unit_Beban=normUnit(r.Unit_Beban); r.Unit_Sumber=normUnit(r.Unit_Sumber); });
       GRP_LOADED.cost=true; initCogsFilters(); ensureFreshness();
     }catch(e){ $("cogsBanner").innerHTML='<div class="cogs-banner warn">Gagal memuat COGS: '+e.message+'</div>'; return; }
     finally{ $("cogsLoading").classList.add("hidden"); } }
   renderCogs();
 }
 document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>showGroup(b.dataset.grp));
+document.querySelectorAll("#ctabs .chip").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#ctabs .chip").forEach(x=>x.classList.toggle("active",x===b));
+  ["summary","dml","srt"].forEach(t=>$("ctab-"+t).style.display=(b.dataset.ct===t?"":"none"));
+  if(b.dataset.ct==="srt")renderSrt();
+});
 
 /* hamburger (mobile) */
 function openSidebar(){ $("sidebar").classList.add("open"); $("backdrop").classList.add("show"); }
