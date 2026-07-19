@@ -1812,7 +1812,7 @@ function showConsPopup(unit,cat){ cat=cat||"T";
     const isTrf=String(r.Tipe||"").toUpperCase()==="TRANSFER";
     if(isBev){ if(isTrf)d.trfB+=a; else d.iniB+=a; } else { if(isTrf)d.trfF+=a; else d.iniF+=a; } });
   const rv=revDaysForUnit(unit,from,to); const rm={}; rv.days.forEach(d=>rm[d.date]={f:d.f||0,b:d.b||0,src:d.src});
-  const dates=[...new Set([...Object.keys(D),...Object.keys(rm)])].sort().filter(t=>D[t]); // hanya hari ada konsumsi
+  const dates=[...new Set([...Object.keys(D),...Object.keys(rm)])].sort();
   const LBL=cat==="F"?"%Food":(cat==="B"?"%Beverage":"%F&B");
   const tgt=targetFor(unit,cat==="T"?null:cat,rv,"SRT");
   openOverlay("Daily Consumption "+unit+(cat==="F"?" \u2014 Food":(cat==="B"?" \u2014 Beverage":"")), from+" s/d "+to+" \u00b7 Food = RAW food; FG = olahan CK \u00b7 Transfer vs pengambilan store sendiri");
@@ -1820,7 +1820,7 @@ function showConsPopup(unit,cat){ cat=cat||"T";
     return `<span class="cogs-pill ${costBand(p,tgt)}">${(p*100).toFixed(1)}%</span>`; };
   let head,rows;
   if(cat==="F"){ let tf=0,tfgk=0,tfgb=0,ttrf=0,tini=0,tr2=0;
-    rows=dates.map(t=>{ const d=D[t]; const rf=(rm[t]||{}).f||0; const tot=d.fd+d.fgk+d.fgb;
+    rows=dates.map(t=>{ const d=D[t]||{fd:0,fgk:0,fgb:0,bev:0,trfF:0,trfB:0,iniF:0,iniB:0}; const rf=(rm[t]||{}).f||0; const tot=d.fd+d.fgk+d.fgb;
       tf+=d.fd;tfgk+=d.fgk;tfgb+=d.fgb;ttrf+=d.trfF;tini+=d.iniF;tr2+=rf;
       return `<tr><td>${t}</td><td class="rt">${moneyFull(d.fd)}</td><td class="rt">${moneyFull(d.fgk)}</td><td class="rt">${moneyFull(d.fgb)}</td>`+
         `<td class="rt">${moneyFull(d.trfF)}</td><td class="rt">${moneyFull(d.iniF)}</td>`+
@@ -1833,7 +1833,7 @@ function showConsPopup(unit,cat){ cat=cat||"T";
       `<th class="rt" title="Tipe TRANSFER (dari store lain)">Transfer</th><th class="rt" title="Tipe INITIAL (pengambilan store sendiri)">Own Store</th>`+
       `<th class="rt">Cost Food</th><th class="rt">Rev Food</th><th class="rt">${LBL}</th>`;
   } else if(cat==="B"){ let tb2=0,ttrf=0,tini=0,tr2=0;
-    rows=dates.map(t=>{ const d=D[t]; const rb=(rm[t]||{}).b||0;
+    rows=dates.map(t=>{ const d=D[t]||{fd:0,fgk:0,fgb:0,bev:0,trfF:0,trfB:0,iniF:0,iniB:0}; const rb=(rm[t]||{}).b||0;
       tb2+=d.bev;ttrf+=d.trfB;tini+=d.iniB;tr2+=rb;
       return `<tr><td>${t}</td><td class="rt">${moneyFull(d.bev)}</td>`+
         `<td class="rt">${moneyFull(d.trfB)}</td><td class="rt">${moneyFull(d.iniB)}</td>`+
@@ -1845,7 +1845,7 @@ function showConsPopup(unit,cat){ cat=cat||"T";
       `<th class="rt" title="Tipe TRANSFER (dari store lain)">Transfer</th><th class="rt" title="Tipe INITIAL (pengambilan store sendiri)">Own Store</th>`+
       `<th class="rt">Rev Bev</th><th class="rt">${LBL}</th>`;
   } else { let tf=0,tfgk=0,tfgb=0,tb2=0,ttrf=0,tini=0,trev=0;
-    rows=dates.map(t=>{ const d=D[t]; const m=rm[t]||{f:0,b:0}; const fb=m.f+m.b; const tot=d.fd+d.fgk+d.fgb+d.bev;
+    rows=dates.map(t=>{ const d=D[t]||{fd:0,fgk:0,fgb:0,bev:0,trfF:0,trfB:0,iniF:0,iniB:0}; const m=rm[t]||{f:0,b:0}; const fb=m.f+m.b; const tot=d.fd+d.fgk+d.fgb+d.bev;
       const trf=d.trfF+d.trfB, ini=d.iniF+d.iniB;
       tf+=d.fd;tfgk+=d.fgk;tfgb+=d.fgb;tb2+=d.bev;ttrf+=trf;tini+=ini;trev+=fb;
       return `<tr><td>${t}</td><td class="rt">${moneyFull(d.fd)}</td><td class="rt">${moneyFull(d.fgk)}</td><td class="rt">${moneyFull(d.fgb)}</td>`+
