@@ -2402,18 +2402,21 @@ const MS = {
   loaded:false, agg:[], daily:[], items:{},           // items: cache per fetch-unit
   months:[], units:[], selUnits:[], charts:{},
 };
-const MS_PLS = { label:"PLS (agg)", members:["TIGADARI","PIDARI","PLS"] };
+const MS_PLS = { label:"PLS", members:["TIGADARI","PIDARI"] };
+const MS_RENAME = { "PLS":"PLS (Spirit & Wine)" };     // unit mentah -> label tampilan
+const MS_RENAME_R = Object.fromEntries(Object.entries(MS_RENAME).map(([k,v])=>[v,k]));
 const MS_CLUSTER = {};                                 // unit -> cluster (diisi dari agg)
 function msNum(v){ return Number(String(v==null?"":v).replace(/,/g,"")) || 0; }
 
 /* --- aturan PLS terpusat: SEMUA fitur wajib lewat dua helper ini --- */
 function msExpandUnits(sel){                           // display -> fetch units
   const out = [];
-  sel.forEach(u => u===MS_PLS.label ? MS_PLS.members.forEach(m=>out.push(m)) : out.push(u));
+  sel.forEach(u => u===MS_PLS.label ? MS_PLS.members.forEach(m=>out.push(m)) : out.push(MS_RENAME_R[u]||u));
   return [...new Set(out)];
 }
 function msDisplayUnit(u){                             // fetch unit -> display unit
-  return (MS.selUnits.includes(MS_PLS.label) && MS_PLS.members.includes(u)) ? MS_PLS.label : u;
+  if(MS.selUnits.includes(MS_PLS.label) && MS_PLS.members.includes(u)) return MS_PLS.label;
+  return MS_RENAME[u]||u;
 }
 
 /* --- fetch --- */
@@ -2480,8 +2483,8 @@ function msUnitOptions(){                              // opsi dropdown sesuai c
   const cl = $("msCluster").value;
   let base = MS.units.filter(u=>!cl || MS_CLUSTER[u]===cl);
   const opts = [];
-  if(!cl || cl==="VD") opts.push(MS_PLS.label);        // PLS agg = cluster VD
-  base.forEach(u=>opts.push(u));
+  if(!cl || cl==="VD") opts.push(MS_PLS.label);        // PLS agg (TIGADARI+PIDARI) = cluster VD
+  base.forEach(u=>opts.push(MS_RENAME[u]||u));
   return opts;
 }
 function msBuildUnitBox(){
@@ -2792,7 +2795,7 @@ function msDayBreakdown(date, rows){
 function msRenderKPI(){
   const rows=msAggRows();
   let rev=0,sold=0; rows.forEach(o=>{ rev+=o.Rev; sold+=o.Sold; });
-  $("msKpiRev").textContent=money(rev);
+  $("msKpiRev").innerHTML=money(rev);
   $("msKpiSold").textContent=Math.round(sold).toLocaleString("en-US");
   const it=MS.selUnits.length ? new Set(msItemRows().filter(o=>o.Sold>0).map(o=>msItemKey(o))).size : null;
   $("msKpiItems").textContent = it===null ? "—" : it.toLocaleString("en-US");
