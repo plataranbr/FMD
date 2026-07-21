@@ -228,6 +228,13 @@
   .cad-chip b{display:block;font-size:16px;color:var(--navy)}
   .over-item{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
 
+  .rtab main{padding-top:4px}
+  #rtab-menu main{padding:18px}
+  .rtabs{margin:10px 0}
+  #rtab-menu header{position:sticky;top:0;z-index:5}
+  .mslocal{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .mslocal select,.msl,.mslocal input[type=search]{height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:0 8px;font-size:12px;font-weight:600;color:var(--ink);max-width:170px}
+  .mslocal input[type=search]{width:130px}
   .unitbox{display:inline-flex;flex-wrap:wrap;gap:2px 8px;max-width:520px}
   .uchk{font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap}
   .uchk input,.ckchk input{vertical-align:middle;margin-right:2px}
@@ -310,6 +317,8 @@
 
     <!-- ======== GRUP REVENUE ======== -->
     <div class="group active" id="grp-revenue">
+
+    <div id="rtab-overview" class="rtab">
   <header>
     <div class="hbar">
       <div class="brand">Revenue Monitoring<small id="periodLabel">—</small></div>
@@ -327,6 +336,10 @@
   </header>
 
   <main>
+    <div class="chips rtabs">
+      <button class="chip active" data-rt="overview">Overview</button>
+      <button class="chip" data-rt="menu">Menu Sales</button>
+    </div>
     <div id="errArea"></div>
 
     <!-- SECTION A -->
@@ -404,6 +417,133 @@
       </div>
     </section>
   </main>
+    </div><!-- /rtab-overview -->
+
+    <!-- ======== SUB-TAB MENU SALES ======== -->
+    <div id="rtab-menu" class="rtab" style="display:none">
+      <header>
+        <div class="hbar">
+          <div class="brand">Menu Sales<small id="msPeriodLabel">—</small></div>
+          <div class="kpis">
+            <div class="kpi"><div class="k-label">Total Revenue</div><div class="k-val" id="msKpiRev">—</div></div>
+            <div class="kpi"><div class="k-label">Total Sold</div><div class="k-val" id="msKpiSold">—</div></div>
+            <div class="kpi"><div class="k-label">Active Items</div><div class="k-val" id="msKpiItems">—</div></div>
+          </div>
+        </div>
+        <div class="cogs-filter">
+          <div class="fgroup"><label>Cluster</label><select id="msCluster"><option value="">All</option><option>VD</option><option>Teras</option></select></div>
+          <div class="fgroup"><label>Unit</label><div class="uddrop"><button type="button" id="msUnitBtn" class="udbtn">Unit: none ▾</button><div id="msUnitBox" class="unitpanel"></div></div></div>
+          <span class="fsep"></span>
+          <div class="fgroup"><label>From</label><select id="msFrom"></select></div>
+          <div class="fgroup"><label>To</label><select id="msTo"></select></div>
+          <span class="fsep"></span>
+          <div class="fgroup"><label>Group</label><select id="msMG"><option value="">All</option><option>FOOD</option><option>BEVERAGE</option><option>WINE</option><option>SPIRIT</option></select></div>
+          <div class="fgroup"><label>Category</label><select id="msCat"><option value="">All</option></select></div>
+          <div class="fgroup"><label>Linktree</label><select id="msLT" title="Item-level features only (MS1 Item, MS2–MS6). Aggregate levels ignore this filter."><option value="">All</option><option value="V">In menu (V)</option><option value="X">Delisted (X)</option></select></div>
+          <div class="fgroup"><label>Value</label><div class="seg" id="msBasis"><button data-b="rev" class="active">Revenue</button><button data-b="sold">Sold</button></div></div>
+        </div>
+      </header>
+      <main>
+        <div class="chips rtabs">
+      <button class="chip" data-rt="overview">Overview</button>
+      <button class="chip active" data-rt="menu">Menu Sales</button>
+    </div>
+        <div id="msLoading" class="cogs-loading hidden"><span class="spin"></span> Loading menu sales…</div>
+        <div id="msWarn"></div>
+
+        <!-- MS7 (moved to top) -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS7</div><h2>Daily Sales Timeline</h2></div>
+            <span class="muted" style="font-size:12px" id="msDailyLabel">Current month only</span>
+          </div>
+          <div class="sec-body">
+            <div class="chart-wrap" style="height:300px"><canvas id="msDailyChart"></canvas></div>
+            <div class="muted" style="font-size:12px;margin-top:6px">Click a date point to see the Main Group breakdown for that day. Category filter does not apply here (daily data has no category).</div>
+            <div id="msDayDetail"></div>
+          </div>
+        </section>
+
+        <!-- MS1 -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS1</div><h2>Monthly Sales Matrix</h2></div>
+            <div class="mslocal">
+            <select id="msM1U"><option value="">All units</option></select>
+            <select id="msM1MG"><option value="">All groups</option><option>FOOD</option><option>BEVERAGE</option><option>WINE</option><option>SPIRIT</option></select>
+            <select id="msM1Cat"><option value="">All categories</option></select>
+            <input type="search" id="msM1Q" placeholder="Search…">
+            <div class="chips" id="msLvl">
+              <button class="chip" data-lv="Cluster">Cluster</button>
+              <button class="chip active" data-lv="Unit">Unit</button>
+              <button class="chip" data-lv="Main_Group">Main Group</button>
+              <button class="chip" data-lv="Category">Category</button>
+              <button class="chip" data-lv="Item">Item</button>
+            </div>
+            </div>
+          </div>
+          <div class="sec-body" style="overflow-x:auto"><div id="msMatrixWrap"></div></div>
+        </section>
+
+        <!-- MS2 -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS2</div><h2>Top / Bottom Sellers</h2></div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <select id="msTBU" class="msl"><option value="">All units</option></select>
+              <select id="msTBMG" class="msl"><option value="">All groups</option><option>FOOD</option><option>BEVERAGE</option><option>WINE</option><option>SPIRIT</option></select>
+              <select id="msTBCat" class="msl"><option value="">All categories</option></select>
+              <div class="seg" id="msTBdir"><button data-d="top" class="active">Top</button><button data-d="bottom">Bottom</button></div>
+              <span class="forecast-field"><input type="number" id="msTBn" min="3" max="50" value="10"><span class="unit">N</span></span>
+              <label class="ckchk" id="msTBzeroWrap" style="display:none"><input type="checkbox" id="msTBzero" checked> exclude zero-sold</label>
+            </div>
+          </div>
+          <div class="sec-body" style="overflow-x:auto"><div id="msTBWrap"></div></div>
+        </section>
+
+        <!-- MS3 -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS3</div><h2>Popularity × Revenue Quadrant</h2></div>
+            <span class="muted" style="font-size:12px">X = units sold · Y = revenue · dashed lines = median · dot = one menu item</span>
+          </div>
+          <div class="sec-body"><div class="chart-wrap" style="height:340px"><canvas id="msQuadChart"></canvas></div></div>
+        </section>
+
+        <!-- MS4 -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS4</div><h2>Movers — Month over Month</h2></div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <span class="muted" style="font-size:12px">Compares last two months in range · min sold base:</span>
+              <span class="forecast-field"><input type="number" id="msMovMin" min="0" max="500" value="10"><span class="unit">qty</span></span>
+            </div>
+          </div>
+          <div class="sec-body" style="overflow-x:auto"><div id="msMovWrap"></div></div>
+        </section>
+
+        <!-- MS5 -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS5</div><h2>Menu Health</h2></div>
+            <span class="muted" style="font-size:12px">Dead = still on menu (V), no sales ≥2 consecutive months · Ghost = delisted (X) but still selling</span>
+          </div>
+          <div class="sec-body" style="overflow-x:auto"><div id="msHealthWrap"></div></div>
+        </section>
+
+        <!-- MS6 -->
+        <section class="section">
+          <div class="sec-head">
+            <div><div class="eyebrow">MS6</div><h2>New Items This Month</h2></div>
+            <span class="muted" style="font-size:12px">First appearance = latest month in data</span>
+          </div>
+          <div class="sec-body" style="overflow-x:auto"><div id="msNewWrap"></div></div>
+        </section>
+
+
+      </main>
+    </div><!-- /rtab-menu -->
+
     </div>
 
     <!-- ======== GRUP COST (stub Langkah A) ======== -->
@@ -2253,6 +2393,443 @@ document.querySelectorAll("#ctabs .chip").forEach(b=>b.onclick=()=>{
   if(b.dataset.ct==="srt")renderSrt();
 });
 
+
+/* =========================================================
+   MENU SALES (sub-tab Revenue) — prefix ms
+   Data: menuAgg (precomputed), menuItems (per unit, cache sesi), menuDaily
+   ========================================================= */
+const MS = {
+  loaded:false, agg:[], daily:[], items:{},           // items: cache per fetch-unit
+  months:[], units:[], selUnits:[], charts:{},
+};
+const MS_PLS = { label:"PLS (agg)", members:["TIGADARI","PIDARI","PLS"] };
+const MS_CLUSTER = {};                                 // unit -> cluster (diisi dari agg)
+function msNum(v){ return Number(String(v==null?"":v).replace(/,/g,"")) || 0; }
+
+/* --- aturan PLS terpusat: SEMUA fitur wajib lewat dua helper ini --- */
+function msExpandUnits(sel){                           // display -> fetch units
+  const out = [];
+  sel.forEach(u => u===MS_PLS.label ? MS_PLS.members.forEach(m=>out.push(m)) : out.push(u));
+  return [...new Set(out)];
+}
+function msDisplayUnit(u){                             // fetch unit -> display unit
+  return (MS.selUnits.includes(MS_PLS.label) && MS_PLS.members.includes(u)) ? MS_PLS.label : u;
+}
+
+/* --- fetch --- */
+async function ensureMenuData(force){
+  if(MS.loaded && !force){ msRenderAll(); return; }
+  $("msLoading").classList.remove("hidden");
+  try{
+    const [agg, daily] = await Promise.all([
+      api({action:"menuAgg", token:STATE.token}),
+      api({action:"menuDaily", token:STATE.token}),
+    ]);
+    if(!agg.ok) throw new Error(agg.error||"menuAgg gagal");
+    if(!daily.ok) throw new Error(daily.error||"menuDaily gagal");
+    MS.agg = agg.data.map(r=>({Month:String(r[0]).slice(0,7), Cluster:r[1], Unit:r[2],
+      Main_Group:r[3], Category:r[4], Sold:msNum(r[5]), Rev:msNum(r[6])}));
+    MS.agg.forEach(r=>MS_CLUSTER[r.Unit]=r.Cluster);
+    MS.months = (agg.meta.months||[]).map(m=>String(m).slice(0,7)).sort();
+    MS.units  = (agg.meta.units||[]).slice().sort();
+    MS.daily = daily.data.map(r=>({Date:String(r[0]).slice(0,10), Cluster:r[1], Unit:r[2],
+      Main_Group:r[3], Sold:msNum(r[4]), Rev:msNum(r[5])}));
+    if(agg.meta.skippedCurrent) $("msWarn").innerHTML =
+      '<div class="cogs-banner warn">Perhatian: '+agg.meta.skippedCurrent+' baris Current di-skip (bulan dobel dgn Monthly).</div>';
+    MS.loaded = true;
+    msInitFilters(); msRebuildCatFilters();
+  }catch(e){
+    $("msWarn").innerHTML = '<div class="cogs-banner warn">Gagal memuat Menu Sales: '+e.message+'</div>';
+  }finally{ $("msLoading").classList.add("hidden"); }
+  msRenderAll();
+}
+
+async function msFetchItems(fetchUnits){               // chunk <=6 sesuai limit server, cache per unit
+  const need = fetchUnits.filter(u=>!MS.items[u]);
+  if(!need.length) return;
+  $("msLoading").classList.remove("hidden");
+  try{
+    for(let i=0;i<need.length;i+=6){
+      const chunk = need.slice(i,i+6);
+      const r = await api({action:"menuItems", token:STATE.token, units:chunk});
+      if(!r.ok) throw new Error(r.error||"menuItems gagal");
+      chunk.forEach(u=>MS.items[u]=[]);
+      r.data.forEach(row=>{
+        const o = {Month:String(row[0]).slice(0,7), Unit:String(row[1]).trim(),
+          Main_Group:row[2], Category:row[3], Art_No:String(row[4]),
+          Menu:row[5], Serving:String(row[6]||""), Linktree:String(row[7]||"").toUpperCase(),
+          Price:msNum(row[8]), Sold:msNum(row[9]), Rev:msNum(row[10])};
+        if(MS.items[o.Unit]) MS.items[o.Unit].push(o);
+      });
+    }
+  }catch(e){
+    $("msWarn").innerHTML = '<div class="cogs-banner warn">Gagal memuat detail item: '+e.message+'</div>';
+  }finally{ $("msLoading").classList.add("hidden"); }
+}
+
+/* --- filter --- */
+function msInitFilters(){
+  const from=$("msFrom"), to=$("msTo");
+  from.innerHTML = MS.months.map(m=>'<option>'+m+'</option>').join("");
+  to.innerHTML = from.innerHTML;
+  from.value = MS.months[Math.max(0,MS.months.length-3)]; to.value = MS.months[MS.months.length-1];
+  $("msPeriodLabel").textContent = MS.months[0]+" – "+MS.months[MS.months.length-1];
+  msBuildUnitBox();
+}
+function msUnitOptions(){                              // opsi dropdown sesuai cluster filter
+  const cl = $("msCluster").value;
+  let base = MS.units.filter(u=>!cl || MS_CLUSTER[u]===cl);
+  const opts = [];
+  if(!cl || cl==="VD") opts.push(MS_PLS.label);        // PLS agg = cluster VD
+  base.forEach(u=>opts.push(u));
+  return opts;
+}
+function msBuildUnitBox(){
+  const box=$("msUnitBox");
+  const opts=msUnitOptions();
+  box.innerHTML = '<div class="uctrl"><button type="button" id="msUall">All</button> <button type="button" id="msUnone">Clear</button></div>'+
+    opts.map(u=>'<label class="uchk"><input type="checkbox" value="'+u+'" '+(MS.selUnits.includes(u)?"checked":"")+'> '+u+'</label>').join("");
+  box.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.onchange=()=>{
+    let sel = [...box.querySelectorAll("input:checked")].map(x=>x.value);
+    if(msExpandUnits(sel).length>6 && cb.checked) toast("Lebih dari 6 unit: load pertama detail item bisa lambat (±10 dtk per 6 unit, di-cache per sesi).");
+    MS.selUnits = sel; msUnitBtnLabel(); msOnUnitsChanged();
+  });
+  box.querySelector("#msUnone").onclick=()=>{ MS.selUnits=[]; msBuildUnitBox(); msUnitBtnLabel(); msRenderAll(); };
+  box.querySelector("#msUall").onclick=()=>{ MS.selUnits=msUnitOptions().filter(u=>u!==MS_PLS.label); toast("Semua unit dipilih: load pertama detail item bertahap, ±10 dtk per 6 unit."); msBuildUnitBox(); msOnUnitsChanged(); };
+  msUnitBtnLabel();
+}
+function msUnitBtnLabel(){
+  $("msUnitBtn").textContent = "Unit: " + (MS.selUnits.length ? MS.selUnits.join(", ").slice(0,28)+(MS.selUnits.join(", ").length>28?"…":"") : "none") + " ▾";
+}
+async function msOnUnitsChanged(){
+  await msFetchItems(msExpandUnits(MS.selUnits));
+  msRebuildCatFilters();
+  msRenderAll();
+}
+function msRange(){ const f=$("msFrom").value, t=$("msTo").value; return f<=t ? [f,t] : [t,f]; }
+function msMonthsInRange(){ const [f,t]=msRange(); return MS.months.filter(m=>m>=f&&m<=t); }
+function msBasis(){ return document.querySelector("#msBasis button.active").dataset.b; }  // 'rev'|'sold'
+function msVal(o){ return msBasis()==="rev" ? o.Rev : o.Sold; }
+function msFmtVal(n){ return msBasis()==="rev" ? money(n) : '<span class="num" data-raw="'+Math.round(n)+'">'+Math.round(n).toLocaleString("en-US")+'</span>'; }
+
+/* item rows: gabungan cache utk unit terpilih + filter aktif (range, MG, Category, Linktree, cluster)
+   loc = override lokal per-card (subset): {u: display unit, mg, cat, ignoreLT} */
+function msItemRows(loc){
+  loc=loc||{};
+  const [f,t]=msRange();
+  const mg = loc.mg || $("msMG").value;
+  const cat= loc.cat|| $("msCat").value;
+  const lt = loc.ignoreLT ? "" : $("msLT").value;
+  const rows=[];
+  msExpandUnits(MS.selUnits).forEach(u=>{
+    (MS.items[u]||[]).forEach(o=>{
+      if(o.Month<f||o.Month>t) return;
+      if(mg && o.Main_Group!==mg) return;
+      if(cat && o.Category!==cat) return;
+      if(lt && o.Linktree!==lt) return;
+      if(loc.u && msDisplayUnit(o.Unit)!==loc.u) return;
+      rows.push(o);
+    });
+  });
+  return rows;
+}
+function msAggRows(loc){
+  loc=loc||{};
+  const [f,t]=msRange(); const cl=$("msCluster").value;
+  const mg = loc.mg || $("msMG").value;
+  const cat= loc.cat|| $("msCat").value;
+  const fu = MS.selUnits.length ? msExpandUnits(MS.selUnits) : null;
+  return MS.agg.filter(o=> o.Month>=f && o.Month<=t
+    && (!mg || o.Main_Group===mg) && (!cat || o.Category===cat) && (!cl || o.Cluster===cl)
+    && (!fu || fu.includes(o.Unit))
+    && (!loc.u || msDisplayUnit(o.Unit)===loc.u));
+}
+function msMGOptions(){
+  const cl=$("msCluster").value;
+  const fu = MS.selUnits.length ? msExpandUnits(MS.selUnits) : null;
+  const set=new Set();
+  MS.agg.forEach(o=>{ if((!cl||o.Cluster===cl)&&(!fu||fu.includes(o.Unit))) set.add(o.Main_Group); });
+  return [...set].sort();
+}
+/* opsi Category dinamis dari agg sesuai Cluster/Unit/MG aktif; dipakai global + lokal */
+function msCatOptions(mg){
+  const cl=$("msCluster").value;
+  const fu = MS.selUnits.length ? msExpandUnits(MS.selUnits) : null;
+  const set=new Set();
+  MS.agg.forEach(o=>{ if((!cl||o.Cluster===cl)&&(!fu||fu.includes(o.Unit))&&(!mg||o.Main_Group===mg)) set.add(o.Category); });
+  return [...set].sort();
+}
+function msFillSelect(id, opts, firstLabel){
+  const el=$(id), cur=el.value;
+  el.innerHTML='<option value="">'+firstLabel+'</option>'+opts.map(c=>'<option>'+c+'</option>').join("");
+  el.value = opts.includes(cur) ? cur : "";
+}
+function msRebuildCatFilters(){
+  const mgs=msMGOptions();
+  msFillSelect("msMG",   mgs, "All");
+  msFillSelect("msM1MG", mgs, "All groups");
+  msFillSelect("msTBMG", mgs, "All groups");
+  msFillSelect("msCat",   msCatOptions($("msMG").value), "All");
+  msFillSelect("msM1Cat", msCatOptions($("msM1MG").value||$("msMG").value), "All categories");
+  msFillSelect("msTBCat", msCatOptions($("msTBMG").value||$("msMG").value), "All categories");
+  const uOpts = MS.selUnits.slice();
+  msFillSelect("msM1U", uOpts, "All units");
+  msFillSelect("msTBU", uOpts, "All units");
+}
+function msItemKey(o){ return msDisplayUnit(o.Unit)+"|"+o.Menu+"|"+o.Serving; }
+function msNeedUnits(id){
+  $(id).innerHTML = '<div class="muted" style="padding:14px;font-size:13px">Select unit(s) in the filter above to load item-level data.</div>';
+}
+
+/* --- MS1 Matrix --- */
+function msRenderMatrix(){
+  const lv = document.querySelector("#msLvl .chip.active").dataset.lv;
+  const months = msMonthsInRange();
+  const wrap=$("msMatrixWrap");
+  const loc={u:$("msM1U").value, mg:$("msM1MG").value, cat:$("msM1Cat").value};
+  let rows;
+  if(lv==="Item"){
+    if(!MS.selUnits.length){ msNeedUnits("msMatrixWrap"); return; }
+    rows = msItemRows(loc).map(o=>({k:msDisplayUnit(o.Unit)+" · "+o.Menu+(o.Serving?" ("+o.Serving+")":""), m:o.Month, v:msVal(o)}));
+  }else{
+    rows = msAggRows(loc).map(o=>({
+      k: lv==="Cluster"?o.Cluster : lv==="Unit"?msDisplayUnit(o.Unit) : lv==="Main_Group"?o.Main_Group : o.Category,
+      m:o.Month, v:msVal(o)}));
+  }
+  const piv={};
+  rows.forEach(r=>{ (piv[r.k]=piv[r.k]||{})[r.m]=(piv[r.k][r.m]||0)+r.v; });
+  const q=($("msM1Q").value||"").trim().toLowerCase();
+  const keys=Object.keys(piv).filter(k=>!q||k.toLowerCase().includes(q))
+    .map(k=>[k, months.reduce((s,m)=>s+(piv[k][m]||0),0)])
+    .sort((a,b)=>b[1]-a[1]);
+  const LIMIT= lv==="Item"?200:9999;
+  let h='<table class="daytbl"><thead><tr><th>'+lv.replace("_"," ")+'</th>'+
+    months.map(m=>'<th class="rt">'+m+'</th>').join("")+'<th class="rt">Total</th></tr></thead><tbody>';
+  keys.slice(0,LIMIT).forEach(([k,tot])=>{
+    h+='<tr><td>'+k+'</td>'+months.map(m=>'<td class="rt">'+msFmtVal(piv[k][m]||0)+'</td>').join("")+
+      '<td class="rt" style="font-weight:700">'+msFmtVal(tot)+'</td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td>Total</td>'+
+    months.map(m=>'<td class="rt">'+msFmtVal(keys.reduce((s,[k])=>s+(piv[k][m]||0),0))+'</td>').join("")+
+    '<td class="rt">'+msFmtVal(keys.reduce((s,[,t2])=>s+t2,0))+'</td></tr></tfoot></table>';
+  if(keys.length>LIMIT) h+='<div class="muted" style="font-size:12px;margin-top:6px">Showing top '+LIMIT+' of '+keys.length+' items (by total).</div>';
+  if(lv!=="Item" && $("msLT").value) h+='<div class="muted" style="font-size:12px;margin-top:6px">Linktree filter ignored at this level (aggregate data has no Linktree flag).</div>';
+  wrap.innerHTML=h;
+}
+
+/* --- MS2 Top/Bottom --- */
+function msRenderTB(){
+  const wrap=$("msTBWrap");
+  if(!MS.selUnits.length){ msNeedUnits("msTBWrap"); return; }
+  const dir=document.querySelector("#msTBdir button.active").dataset.d;
+  $("msTBzeroWrap").style.display = dir==="bottom" ? "" : "none";
+  const N=Math.max(3,Math.min(50,msNum($("msTBn").value)||10));
+  const loc={u:$("msTBU").value, mg:$("msTBMG").value, cat:$("msTBCat").value};
+  const agg={};
+  msItemRows(loc).forEach(o=>{
+    const k=msItemKey(o);
+    const a=agg[k]=agg[k]||{Unit:msDisplayUnit(o.Unit),Menu:o.Menu,Serving:o.Serving,Category:o.Category,Price:0,Sold:0,Rev:0};
+    a.Sold+=o.Sold; a.Rev+=o.Rev; a.Price=o.Price||a.Price; a.Category=o.Category;
+  });
+  let list=Object.values(agg);
+  if(dir==="bottom" && $("msTBzero").checked) list=list.filter(a=>a.Sold>0);
+  const key=msBasis()==="rev"?"Rev":"Sold";
+  list.sort((a,b)=> dir==="top" ? b[key]-a[key] : a[key]-b[key]);
+  list=list.slice(0,N);
+  let h='<table class="daytbl"><thead><tr><th>#</th><th>Unit</th><th>Menu</th><th>Serving</th><th>Category</th>'+
+    '<th class="rt">Price</th><th class="rt">Sold</th><th class="rt">Revenue</th></tr></thead><tbody>';
+  list.forEach((a,i)=>{ h+='<tr><td>'+(i+1)+'</td><td>'+a.Unit+'</td><td>'+a.Menu+'</td><td>'+(a.Serving||"—")+'</td><td>'+a.Category+'</td>'+
+    '<td class="rt">'+money(a.Price)+'</td><td class="rt">'+a.Sold.toLocaleString("en-US")+'</td><td class="rt">'+money(a.Rev)+'</td></tr>'; });
+  wrap.innerHTML=h+'</tbody></table>';
+}
+
+/* --- MS3 Quadrant --- */
+function msRenderQuad(){
+  const cv=$("msQuadChart");
+  if(MS.charts.quad){ MS.charts.quad.destroy(); MS.charts.quad=null; }
+  if(!MS.selUnits.length){ return; }
+  const agg={};
+  msItemRows().forEach(o=>{ const k=msItemKey(o);
+    const a=agg[k]=agg[k]||{label:o.Menu+(o.Serving?" ("+o.Serving+")":"")+" · "+msDisplayUnit(o.Unit),Sold:0,Rev:0};
+    a.Sold+=o.Sold; a.Rev+=o.Rev; });
+  const pts=Object.values(agg).filter(a=>a.Sold>0||a.Rev>0);
+  if(!pts.length) return;
+  const med=arr=>{const s=[...arr].sort((a,b)=>a-b);const n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2;};
+  const mx=med(pts.map(p=>p.Sold)), my=med(pts.map(p=>p.Rev));
+  MS.charts.quad=new Chart(cv,{type:"scatter",
+    data:{datasets:[{data:pts.map(p=>({x:p.Sold,y:p.Rev,label:p.label})),
+      backgroundColor:"rgba(30,58,110,.55)",pointRadius:4,pointHoverRadius:6}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.raw.label+": "+c.raw.x.toLocaleString()+" sold · "+fmt(c.raw.y)}}},
+      scales:{x:{title:{display:true,text:"Units sold"}},y:{title:{display:true,text:"Revenue"},ticks:{callback:v=>fmt(v)}}}},
+    plugins:[{id:"msMedian",afterDraw(ch){const {ctx,chartArea:ca,scales:{x,y}}=ch;
+      ctx.save();ctx.strokeStyle="#C9A227";ctx.setLineDash([5,4]);ctx.lineWidth=1;
+      const px=x.getPixelForValue(mx), py=y.getPixelForValue(my);
+      ctx.beginPath();ctx.moveTo(px,ca.top);ctx.lineTo(px,ca.bottom);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(ca.left,py);ctx.lineTo(ca.right,py);ctx.stroke();ctx.restore();}}]});
+}
+
+/* --- MS4 Movers --- */
+function msRenderMovers(){
+  const wrap=$("msMovWrap");
+  if(!MS.selUnits.length){ msNeedUnits("msMovWrap"); return; }
+  const months=msMonthsInRange();
+  if(months.length<2){ wrap.innerHTML='<div class="muted" style="padding:14px;font-size:13px">Range must cover at least 2 months.</div>'; return; }
+  const mB=months[months.length-1], mA=months[months.length-2];
+  const minS=msNum($("msMovMin").value);
+  const agg={};
+  msItemRows().forEach(o=>{
+    if(o.Month!==mA&&o.Month!==mB) return;
+    const k=msItemKey(o);
+    const a=agg[k]=agg[k]||{Unit:msDisplayUnit(o.Unit),Menu:o.Menu,Serving:o.Serving,A:0,B:0};
+    if(o.Month===mA)a.A+=o.Sold; else a.B+=o.Sold;
+  });
+  const list=Object.values(agg).filter(a=>a.A>=minS).map(a=>({...a,d:a.A?((a.B-a.A)/a.A):null}))
+    .filter(a=>a.d!=null);
+  const dec=[...list].sort((a,b)=>a.d-b.d).slice(0,10);
+  const inc=[...list].sort((a,b)=>b.d-a.d).slice(0,10);
+  const tbl=(title,arr)=>{
+    let h='<div style="flex:1;min-width:320px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">'+title+'</div>'+
+      '<table class="daytbl"><thead><tr><th>Unit</th><th>Menu</th><th class="rt">'+mA+'</th><th class="rt">'+mB+'</th><th class="rt">Δ%</th></tr></thead><tbody>';
+    arr.forEach(a=>{const p=(a.d*100).toFixed(0)+"%";
+      h+='<tr><td>'+a.Unit+'</td><td>'+a.Menu+(a.Serving?" ("+a.Serving+")":"")+'</td><td class="rt">'+a.A+'</td><td class="rt">'+a.B+'</td>'+
+        '<td class="rt" style="font-weight:700;color:'+(a.d<0?"#8C2F2F":"#276B43")+'">'+(a.d>0?"+":"")+p+'</td></tr>';});
+    return h+'</tbody></table></div>';
+  };
+  wrap.innerHTML='<div style="display:flex;gap:18px;flex-wrap:wrap">'+tbl("Top decliners ("+mA+" → "+mB+")",dec)+tbl("Top gainers",inc)+'</div>'+
+    '<div class="muted" style="font-size:12px;margin-top:6px">Only items with ≥'+minS+' sold in '+mA+' (change filter above). Sold qty, not revenue.</div>';
+}
+
+/* --- MS5 Health --- */
+function msRenderHealth(){
+  const wrap=$("msHealthWrap");
+  if(!MS.selUnits.length){ msNeedUnits("msHealthWrap"); return; }
+  const months=msMonthsInRange();
+  const last=months[months.length-1], prev=months.length>1?months[months.length-2]:null;
+  const by={};
+  msItemRows({ignoreLT:true}).forEach(o=>{ const k=msItemKey(o);
+    const a=by[k]=by[k]||{Unit:msDisplayUnit(o.Unit),Menu:o.Menu,Serving:o.Serving,Category:o.Category,per:{},lt:{}};
+    a.per[o.Month]=(a.per[o.Month]||0)+o.Sold; a.lt[o.Month]=o.Linktree; });
+  const dead=[],ghost=[];
+  Object.values(by).forEach(a=>{
+    const sL=a.per[last]||0, sP=prev?(a.per[prev]||0):null;
+    const ltL=a.lt[last]||"";
+    if(ltL==="V" && sL===0 && (prev? (a.per[prev]!==undefined && sP===0) : true) && a.per[last]!==undefined) dead.push(a);
+    if(ltL==="X" && sL>0) ghost.push({...a,Sold:sL});
+  });
+  const t1='<div style="flex:1;min-width:320px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Dead menu (candidates for delisting) — '+dead.length+'</div>'+
+    '<table class="daytbl"><thead><tr><th>Unit</th><th>Menu</th><th>Category</th></tr></thead><tbody>'+
+    dead.slice(0,60).map(a=>'<tr><td>'+a.Unit+'</td><td>'+a.Menu+(a.Serving?" ("+a.Serving+")":"")+'</td><td>'+a.Category+'</td></tr>').join("")+
+    '</tbody></table>'+(dead.length>60?'<div class="muted" style="font-size:12px">…+'+(dead.length-60)+' more</div>':'')+'</div>';
+  const t2='<div style="flex:1;min-width:320px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Delisted but still selling (control anomaly) — '+ghost.length+'</div>'+
+    '<table class="daytbl"><thead><tr><th>Unit</th><th>Menu</th><th class="rt">Sold '+last+'</th></tr></thead><tbody>'+
+    ghost.sort((a,b)=>b.Sold-a.Sold).slice(0,60).map(a=>'<tr><td>'+a.Unit+'</td><td>'+a.Menu+(a.Serving?" ("+a.Serving+")":"")+'</td><td class="rt">'+a.Sold+'</td></tr>').join("")+
+    '</tbody></table></div>';
+  wrap.innerHTML='<div style="display:flex;gap:18px;flex-wrap:wrap">'+t1+t2+'</div>';
+}
+
+/* --- MS6 New items --- */
+function msRenderNew(){
+  const wrap=$("msNewWrap");
+  if(!MS.selUnits.length){ msNeedUnits("msNewWrap"); return; }
+  const latest=MS.months[MS.months.length-1];
+  const first={},acc={};
+  msExpandUnits(MS.selUnits).forEach(u=>(MS.items[u]||[]).forEach(o=>{     // seluruh histori, abaikan range
+    const k=msItemKey(o);
+    if(!(k in first)||o.Month<first[k]) first[k]=o.Month;
+    if(o.Month===latest){ const a=acc[k]=acc[k]||{Unit:msDisplayUnit(o.Unit),Menu:o.Menu,Serving:o.Serving,Category:o.Category,Sold:0,Rev:0};
+      a.Sold+=o.Sold; a.Rev+=o.Rev; }
+  }));
+  const list=Object.keys(acc).filter(k=>first[k]===latest).map(k=>acc[k]).sort((a,b)=>b.Rev-a.Rev);
+  if(!list.length){ wrap.innerHTML='<div class="muted" style="padding:14px;font-size:13px">No new items in '+latest+'.</div>'; return; }
+  wrap.innerHTML='<table class="daytbl"><thead><tr><th>Unit</th><th>Menu</th><th>Category</th><th class="rt">Sold</th><th class="rt">Revenue</th></tr></thead><tbody>'+
+    list.map(a=>'<tr><td>'+a.Unit+'</td><td>'+a.Menu+(a.Serving?" ("+a.Serving+")":"")+'</td><td>'+a.Category+'</td><td class="rt">'+a.Sold+'</td><td class="rt">'+money(a.Rev)+'</td></tr>').join("")+
+    '</tbody></table><div class="muted" style="font-size:12px;margin-top:6px">First month = '+latest+' across full history of selected units.</div>';
+}
+
+/* --- MS7 Daily --- */
+function msRenderDaily(){
+  const cv=$("msDailyChart");
+  if(MS.charts.daily){ MS.charts.daily.destroy(); MS.charts.daily=null; }
+  const mg=$("msMG").value; const cl=$("msCluster").value;
+  const fu=MS.selUnits.length?msExpandUnits(MS.selUnits):null;
+  const rows=MS.daily.filter(o=>(!mg||o.Main_Group===mg)&&(!cl||o.Cluster===cl)&&(!fu||fu.includes(o.Unit)));
+  if(!rows.length) return;
+  const dates=[...new Set(rows.map(o=>o.Date))].sort();
+  const groups=[...new Set(rows.map(o=>o.Main_Group))].sort();
+  const basisRev=msBasis()==="rev";
+  const col={FOOD:"#4C7BE0",BEVERAGE:"#C9A227",WINE:"#8C2F2F",SPIRIT:"#276B43"};
+  const ds=groups.map(g=>{
+    const per={}; rows.forEach(o=>{ if(o.Main_Group===g) per[o.Date]=(per[o.Date]||0)+(basisRev?o.Rev:o.Sold); });
+    return {label:g,data:dates.map(d=>per[d]||0),borderColor:col[g]||"#888",backgroundColor:col[g]||"#888",tension:.25,pointRadius:2};
+  });
+  $("msDailyLabel").textContent="Current month only · "+dates[0]+" – "+dates[dates.length-1];
+  $("msDayDetail").innerHTML="";
+  MS.charts.daily=new Chart(cv,{type:"line",data:{labels:dates.map(d=>d.slice(8)),datasets:ds},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},
+      scales:{y:{ticks:{callback:v=>basisRev?fmt(v):v.toLocaleString()}}},
+      onClick:(e,els,ch)=>{
+        const pts=ch.getElementsAtEventForMode(e,"index",{intersect:false},true);
+        if(!pts.length) return;
+        msDayBreakdown(dates[pts[0].index], rows);
+      }}});
+}
+function msDayBreakdown(date, rows){
+  const per={};
+  rows.forEach(o=>{ if(o.Date!==date) return;
+    const a=per[o.Main_Group]=per[o.Main_Group]||{Sold:0,Rev:0}; a.Sold+=o.Sold; a.Rev+=o.Rev; });
+  const gs=Object.keys(per).sort();
+  let tS=0,tR=0;
+  let h='<div style="font-weight:700;font-size:13px;margin:10px 0 6px">Breakdown '+date+'</div>'+
+    '<table class="daytbl"><thead><tr><th>Main Group</th><th class="rt">Sold</th><th class="rt">Revenue</th></tr></thead><tbody>';
+  gs.forEach(g=>{ tS+=per[g].Sold; tR+=per[g].Rev;
+    h+='<tr><td>'+g+'</td><td class="rt">'+per[g].Sold.toLocaleString("en-US")+'</td><td class="rt">'+money(per[g].Rev)+'</td></tr>'; });
+  h+='</tbody><tfoot><tr><td>Total</td><td class="rt">'+tS.toLocaleString("en-US")+'</td><td class="rt">'+money(tR)+'</td></tr></tfoot></table>'+
+    '<div class="muted" style="font-size:12px;margin-top:4px">Item-level daily detail not available (daily data is aggregated by Main Group).</div>';
+  $("msDayDetail").innerHTML=h;
+}
+
+function msRenderKPI(){
+  const rows=msAggRows();
+  let rev=0,sold=0; rows.forEach(o=>{ rev+=o.Rev; sold+=o.Sold; });
+  $("msKpiRev").textContent=money(rev);
+  $("msKpiSold").textContent=Math.round(sold).toLocaleString("en-US");
+  const it=MS.selUnits.length ? new Set(msItemRows().filter(o=>o.Sold>0).map(o=>msItemKey(o))).size : null;
+  $("msKpiItems").textContent = it===null ? "—" : it.toLocaleString("en-US");
+}
+function msRenderAll(){
+  if(!MS.loaded) return;
+  msRenderKPI();
+  msRenderMatrix(); msRenderTB(); msRenderQuad(); msRenderMovers(); msRenderHealth(); msRenderNew(); msRenderDaily();
+}
+
+/* --- sub-tab switch + wiring --- */
+function showRtab(name){
+  document.querySelectorAll(".rtabs .chip").forEach(x=>x.classList.toggle("active",x.dataset.rt===name));
+  $("rtab-overview").style.display = name==="overview"?"":"none";
+  $("rtab-menu").style.display = name==="menu"?"":"none";
+  if(name==="menu") ensureMenuData();
+  else resizeRevenueCharts();
+}
+document.querySelectorAll(".rtabs .chip").forEach(b=>b.onclick=()=>showRtab(b.dataset.rt));
+["msFrom","msTo","msCat","msLT"].forEach(id=>$(id).onchange=msRenderAll);
+$("msMG").onchange=()=>{ msRebuildCatFilters(); msRenderAll(); };
+$("msCluster").onchange=()=>{ MS.selUnits=MS.selUnits.filter(u=>msUnitOptions().includes(u)); msBuildUnitBox(); msRebuildCatFilters(); msRenderAll(); };
+["msM1U","msM1Cat"].forEach(id=>$(id).onchange=msRenderMatrix);
+$("msM1Q").oninput=msRenderMatrix;
+$("msM1MG").onchange=()=>{ msFillSelect("msM1Cat", msCatOptions($("msM1MG").value||$("msMG").value), "All categories"); msRenderMatrix(); };
+["msTBU","msTBCat"].forEach(id=>$(id).onchange=msRenderTB);
+$("msTBMG").onchange=()=>{ msFillSelect("msTBCat", msCatOptions($("msTBMG").value||$("msMG").value), "All categories"); msRenderTB(); };
+$("msUnitBtn").onclick=()=>$("msUnitBox").classList.toggle("open");
+document.addEventListener("click",e=>{ if(!e.target.closest("#msUnitBtn")&&!e.target.closest("#msUnitBox")) $("msUnitBox").classList.remove("open"); });
+document.querySelectorAll("#msBasis button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#msBasis button").forEach(x=>x.classList.toggle("active",x===b)); msRenderAll(); });
+document.querySelectorAll("#msLvl .chip").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#msLvl .chip").forEach(x=>x.classList.toggle("active",x===b)); msRenderMatrix(); });
+document.querySelectorAll("#msTBdir button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#msTBdir button").forEach(x=>x.classList.toggle("active",x===b)); msRenderTB(); });
+$("msTBn").onchange=msRenderTB; $("msTBzero").onchange=msRenderTB; $("msMovMin").onchange=msRenderMovers;
+
 /* hamburger (mobile) */
 function openSidebar(){ $("sidebar").classList.add("open"); $("backdrop").classList.add("show"); }
 function closeSidebar(){ $("sidebar").classList.remove("open"); $("backdrop").classList.remove("show"); }
@@ -2271,6 +2848,7 @@ async function reloadData(){
     computePeriod(); computeSectionC(); renderKPI(); renderTableC(); renderTableD();
     renderDailyChart(); renderSmallMultiples();
     toast("Data diperbarui");
+    if($("rtab-menu").style.display!=="none"){ MS.loaded=false; MS.items={}; ensureMenuData(true); }
   }catch(e){ showErr("Gagal refresh: "+e.message); }
   finally{ btn.disabled=false; btn.textContent=old; }
 }
