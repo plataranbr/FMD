@@ -1573,7 +1573,7 @@ function unitNames(u){ const dim=STATE.data.DIM_UNIT||[];
 function subKategoriOf(r){ // prefix hanya bermakna bila sumber = CK; ArtNo pasti 7 digit
   if(String(r.Unit_Sumber||"").trim()!=="CK") return "RAW";
   const s=String(r.ArtNo||""); if(s.length!==7) return "RAW";
-  if(s.startsWith("1119")) return "FG_KITCHEN";
+  if(s.startsWith("1117")||s.startsWith("1118")||s.startsWith("1119")) return "FG_KITCHEN";
   if(s.startsWith("1120")) return "FG_BAKERY"; // BAKERY -> dept Kitchen (kategori COA FOOD)
   return "RAW";
 }
@@ -1631,14 +1631,16 @@ function lastFullMonth(){ const la=STATE.lastActualDate||""; if(!la)return null;
   const y=d.getUTCFullYear(),m=d.getUTCMonth()+1; return {from:`${y}-${String(m).padStart(2,"0")}-01`, to:d.toISOString().slice(0,10)}; }
 
 // revenue per unit: per hari actual bila ada, else forecast (snapshot terbaru). Jumlah atas [from,to].
+const REV_MERGE={PLCS:["PLCS","PKJ"]}; // rev PKJ digabung ke PLCS: belanja & SR event PKJ lewat PLCS (cabut bila PKJ punya cost data sendiri)
 function revDaysForUnit(unit,from,to){
+  const uset=new Set(REV_MERGE[unit]||[unit]);
   const rev=STATE.data.Revenue_Master||[], fc=STATE.data.Forecast_Output||[];
   const act={}; let lastAct="";
-  rev.forEach(r=>{ if(String(r.Unit||"").trim()!==unit)return; const t=dstr(r.Tanggal); if(t<from||t>to)return;
+  rev.forEach(r=>{ if(!uset.has(String(r.Unit||"").trim()))return; const t=dstr(r.Tanggal); if(t<from||t>to)return;
     (act[t]=act[t]||{food:0,bev:0,event:0}); act[t].food+=Number(r.Food)||0; act[t].bev+=Number(r.Beverage)||0; act[t].event+=Number(r.Event)||0;
     if(t>lastAct)lastAct=t; });
   const best={};
-  fc.forEach(r=>{ if(String(r.Unit||"").trim()!==unit)return; const td=dstr(r.Target_Date); if(td<from||td>to)return;
+  fc.forEach(r=>{ if(!uset.has(String(r.Unit||"").trim()))return; const td=dstr(r.Target_Date); if(td<from||td>to)return;
     const k=(r.Outlet||"")+"|"+td, sd=dstr(r.Snapshot_Date); if(!best[k]||sd>best[k]._sd) best[k]={...r,_sd:sd}; });
   const fcDay={}; Object.values(best).forEach(r=>{ const td=dstr(r.Target_Date);
     (fcDay[td]=fcDay[td]||{food:0,bev:0,event:0}); fcDay[td].food+=Number(r.Food_Reg)||0; fcDay[td].bev+=Number(r.Bev_Reg)||0; fcDay[td].event+=Number(r.Event)||0; });
