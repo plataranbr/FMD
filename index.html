@@ -563,6 +563,7 @@
           <span class="fsep"></span>
           <div class="fgroup"><label>Target</label><span class="muted" style="font-size:12px;white-space:nowrap" title="Konstanta target cost per sumber data (Food = Bev). Di atas target = merah; 90–100% target = kuning/oranye.">Summary 29% · DML 14% · SR/Trf 15%</span></div>
           <label class="ckchk" title="Off = rasio dihitung tanpa gas (M400091 / GAS 12KG); data asli tetap utuh di Detail DML. Butuh tab DML_Gas_Daily dari Apps Script."><input type="checkbox" id="cogsInclGas"> include gas</label>
+          <div class="fgroup"><label>FG CK Source</label><select id="cogsFgSrc" title="Manual = pakai input tim CK (tab CK_FG_Transfer); baris FG dari Consumption_Master di-exclude agar tidak dobel. Consumption = tampilan lama, data manual diabaikan."><option value="MAN">Manual (CK input)</option><option value="CONS">Consumption (legacy)</option></select></div>
         </div>
       </header>
       <div class="cogs-wrap">
@@ -570,6 +571,7 @@
         <div class="chips" id="ctabs" style="margin:10px 0">
           <button class="chip" data-ct="dml">DML (Purchase)</button>
           <button class="chip" data-ct="srt">SR / Transfer</button>
+          <button class="chip" data-ct="ck">CK</button>
           <button class="chip active" data-ct="summary">Summary</button>
         </div>
         <div id="ctab-summary" class="ctab">
@@ -724,6 +726,29 @@
             <tbody id="sdBody"></tbody></table></div>
         </section>
         </div><!-- /ctab-srt -->
+
+        <div id="ctab-ck" class="ctab" style="display:none">
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">CK #1</div><h2>Central Kitchen &mdash; FG Production &amp; Transfer</h2></div>
+            <span class="muted" style="font-size:12px">Sumber: input tim CK (CK_FG_Production &amp; CK_FG_Transfer). Filter periode ikut From/To di atas; pilihan Unit tidak berlaku di tab ini (semua khusus CK).</span></div>
+          <div class="sec-body">
+            <div id="cktKpi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px"></div>
+            <div style="overflow-x:auto"><table class="daytbl">
+              <thead><tr><th>Date</th><th class="rt">Production</th><th class="rt">Transfer Out</th><th class="rt">Net (Prod &minus; Trf)</th><th></th></tr></thead>
+              <tbody id="cktDayBody"></tbody></table></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="sec-head"><div><div class="eyebrow">CK #2</div><h2>Raw Material Input vs FG Production Output</h2></div>
+            <span class="muted" style="font-size:12px" title="Input = DML CK (pembelian langsung) + Consumption CK Tipe INITIAL (pengambilan store sendiri, non-FG). Output = nilai produksi FG (harga internal). Per hari tidak apple-to-apple (WIP/batch & lead-time belanja) &mdash; baca angka akumulasi periode.">Input = DML CK + Store INITIAL (non-FG) &middot; Output = FG Production value &middot; bandingkan akumulasi periode, bukan harian &#9432;</span></div>
+          <div class="sec-body">
+            <div id="cktCmpKpi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px"></div>
+            <div style="overflow-x:auto"><table class="daytbl">
+              <thead><tr><th>Component</th><th class="rt">Amount</th><th></th></tr></thead>
+              <tbody id="cktCmpBody"></tbody></table></div>
+          </div>
+        </section>
+        </div><!-- /ctab-ck -->
       </div>
     </div>
   </div>
@@ -1566,6 +1591,10 @@ function gasOn(){ const e=$("cogsInclGas"); return !!(e&&e.checked); }
 function gasMap(){ const m={}; (STATE.data.DML_Gas_Daily||[]).forEach(r=>{ const u=normUnit(r.Unit); const t=dstr(r.Tanggal);
     ((m[u]=m[u]||{})[t]=(m[u][t]||0)+(Number(r.Amount)||0)); }); return m; }
 function gasAmt(gm,u,from,to){ let x=0; const d=gm[u]||{}; for(const t in d) if(t>=from&&t<=to) x+=d[t]; return x; }
+function fgManualOn(){ const e=$("cogsFgSrc"); return !e||e.value!=="CONS"; }
+const FG_CK_PREFIX=["1117","1118","1119","1120","1121"]; // = isi FG_Master spreadsheet CK
+function isFgCK(r){ if(String(r.Unit_Sumber||"").trim()!=="CK")return false;
+  const a=String(r.ArtNo||""); return a.length===7&&FG_CK_PREFIX.some(p=>a.startsWith(p)); }
 const HIDE_UNITS=new Set(["PW","PGS"]); // data belum ada -> sembunyikan dulu
 function unitOrderIdx(u){ const dim=STATE.data.DIM_UNIT||[]; for(let k=0;k<dim.length;k++) if(String(dim[k].Unit).trim()===u) return k; return 999; }
 function unitNames(u){ const dim=STATE.data.DIM_UNIT||[];
@@ -1574,20 +1603,24 @@ function subKategoriOf(r){ // prefix hanya bermakna bila sumber = CK; ArtNo past
   if(String(r.Unit_Sumber||"").trim()!=="CK") return "RAW";
   const s=String(r.ArtNo||""); if(s.length!==7) return "RAW";
   if(s.startsWith("1117")||s.startsWith("1118")||s.startsWith("1119")) return "FG_KITCHEN";
-  if(s.startsWith("1120")) return "FG_BAKERY"; // BAKERY -> dept Kitchen (kategori COA FOOD)
+  if(s.startsWith("1120")||s.startsWith("1121")) return "FG_BAKERY"; // BAKERY -> dept Kitchen (kategori COA FOOD)
   return "RAW";
+}
+function consFilter_(r,from,to,sel){ // predikat bersama Consumption_Master & baris manual FG CK
+  const k=String(r.Kategori||"").toUpperCase(); if(k!=="FOOD"&&k!=="BEVERAGE")return false;
+  const u=String(r.Unit_Beban||"").trim(); if(!u||!sel.has(u))return false;
+  const t=dstr(r.Tanggal); if(t<from||t>to)return false;
+  const tipe=String(r.Tipe||"").toUpperCase();
+  const fromStore=STORE_UNITS.includes(String(r.Unit_Sumber||"").trim());
+  // unit ber-store: semua baris beban-nya. unit lain: hanya TRANSFER masuk dari store.
+  return STORE_UNITS.includes(u) || (tipe==="TRANSFER"&&fromStore);
 }
 function consRows(){ // baris konsumsi relevan pd filter periode+unit; FOOD/BEV saja
   const {from,to}=cogsRange(); const sel=new Set(cogsSelectedUnits());
-  return (STATE.data.Consumption_Master||[]).filter(r=>{
-    const k=String(r.Kategori||"").toUpperCase(); if(k!=="FOOD"&&k!=="BEVERAGE")return false;
-    const u=String(r.Unit_Beban||"").trim(); if(!u||!sel.has(u))return false;
-    const t=dstr(r.Tanggal); if(t<from||t>to)return false;
-    const tipe=String(r.Tipe||"").toUpperCase();
-    const fromStore=STORE_UNITS.includes(String(r.Unit_Sumber||"").trim());
-    // unit ber-store: semua baris beban-nya. unit lain: hanya TRANSFER masuk dari store.
-    return STORE_UNITS.includes(u) || (tipe==="TRANSFER"&&fromStore);
-  });
+  const man=fgManualOn();
+  let rows=(STATE.data.Consumption_Master||[]).filter(r=>consFilter_(r,from,to,sel)&&(!man||!isFgCK(r)));
+  if(man) rows=rows.concat((STATE.data.CK_FG_Rows||[]).filter(r=>consFilter_(r,from,to,sel)));
+  return rows;
 }
 function consAgg(){ // agregat per unit + per hari + flag INCOMPLETE
   const per={},day={},inc={};
@@ -1688,7 +1721,7 @@ function cogsData(){
     u.relDot=u.inc>0?"INCOMPLETE":(u.ind>0?"INDICATIVE":"RELIABLE"); });
   return {U,relAmt,from,to};
 }
-function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderDayChart(); renderCogsTable(); renderDmlRatio(); renderSrt(); }
+function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderDayChart(); renderCogsTable(); renderDmlRatio(); renderSrt(); renderCkTab(); }
 function renderDmlRatio(){
   const tb=$("dmlRatioBody"); if(!tb)return;
   const {from,to}=cogsRange(); const U=cogsData().U;
@@ -1805,16 +1838,20 @@ async function ensureCadence(){
 function renderCogsWarn(){ const {from,to}=cogsRange(); const days=rangeDays(from,to); const n=cogsFwd(); let msg="";
   if(n>LEAD_TIME_MIN) msg="\u26a0 +"+n+" hari forecast melebihi lead-time belanja (~"+LEAD_TIME_MIN+" hari). Revenue hari-hari itu ditambahkan tanpa cost pasangannya \u2014 rasio bisa turun palsu.";
   else if(days>0&&days<LEAD_TIME_MIN) msg="\u26a0 Periode terlalu pendek ("+days+" hari). Belanja hari ini sering untuk stok beberapa hari ke depan, jadi rasio bisa terlihat terlalu tinggi. Pilih minimal 1 minggu untuk angka yang wajar.";
-  $("cogsWarn").innerHTML = msg ? `<div class="cogs-banner warn">${msg}</div>` : ""; }
+  let out = msg ? `<div class="cogs-banner warn">${msg}</div>` : "";
+  if(fgManualOn()&&GRP_LOADED.cost){ const hasMan=(STATE.data.CK_FG_Rows||[]).some(r=>{const t=dstr(r.Tanggal);return t>=from&&t<=to;});
+    if(!hasMan) out+=`<div class="cogs-banner warn">\u26a0 FG CK manual (CK_FG_Transfer) belum ada data pada periode ini \u2014 komponen FG CK di SR/Transfer & Summary saat ini NOL, bukan turun sungguhan. Isi/sync input tim CK, atau ganti FG CK Source ke Consumption (legacy).</div>`; }
+  $("cogsWarn").innerHTML = out; }
 function renderCogsBanner(){ const {relAmt}=cogsData(); const tot=(relAmt.RELIABLE||0)+(relAmt.INDICATIVE||0)+(relAmt.INCOMPLETE||0);
   const ind=tot>0?Math.round((relAmt.INDICATIVE||0)/tot*100):0;
   const tip="Sebagian nilai ("+ind+"%) masih estimasi dari catatan belanja (LOG), belum dicocokkan dengan order final. Angka bisa berubah setelah verifikasi.";
   $("cogsBanner").innerHTML=`<div class="cogs-banner warn">COGS = belanja langsung (DML) + konsumsi store (SR/Transfer) \u2014 dua aliran terpisah. Sebagian nilai DML masih estimasi, belum dicek final. <span class="infodot" title="${tip}">\u24d8</span></div>`; }
 function renderCogsTotal(){ const {U}=sumData();
   const ct=(document.querySelector("#ctabs .chip.active")||{}).dataset?.ct||"summary";
-  const M={summary:{f:u=>u.tot, lab:"Total COGS", pl:"All-Unit %COGS (excl CK)", src:"SUM"},
+  const MM={summary:{f:u=>u.tot, lab:"Total COGS", pl:"All-Unit %COGS (excl CK)", src:"SUM"},
            dml:{f:u=>u.dmlTot, lab:"Total DML", pl:"All-Unit %DML (excl CK)", src:"DML"},
-           srt:{f:u=>u.cons, lab:"Total SR/Transfer", pl:"All-Unit %SR/Trf (excl CK)", src:"SRT"}}[ct];
+           srt:{f:u=>u.cons, lab:"Total SR/Transfer", pl:"All-Unit %SR/Trf (excl CK)", src:"SRT"}};
+  const M=MM[ct]||MM.summary; // chip "ck" tak punya metric header sendiri -> pakai Summary
   let cogs=0,rev=0,tw=0; Object.values(U).forEach(u=>{ if(u.unit==="CK")return; cogs+=M.f(u); rev+=u.revTot;
     tw+=targetFor(u.unit,"F",null,M.src)*(u.revFood||0)+targetFor(u.unit,"B",null,M.src)*(u.revBev||0); });
   const tgtAll=rev>0?tw/rev:(TGT[M.src].F+TGT[M.src].B)/2;
@@ -2020,7 +2057,7 @@ function initCogsFilters(){
   box.addEventListener("click",(e)=>{ const s=e.target.dataset.sel; if(!s)return;
     box.querySelectorAll("input[type=checkbox]").forEach(i=>i.checked=(s==="all")); updUnitLabel(); renderCogs(); });
   if(!$("cogsFrom").value){ $("cogsFrom").value=(STATE.currentMonth||"")+"-01"; $("cogsTo").value=STATE.lastActualDate||""; }
-  $("cogsFrom").onchange=renderCogs; $("cogsTo").onchange=renderCogs; if($("cogsInclGas"))$("cogsInclGas").onchange=renderCogs;
+  $("cogsFrom").onchange=renderCogs; $("cogsTo").onchange=renderCogs; if($("cogsInclGas"))$("cogsInclGas").onchange=renderCogs; if($("cogsFgSrc"))$("cogsFgSrc").onchange=renderCogs;
   let _fwdT; $("cogsFwd").oninput=()=>{ clearTimeout(_fwdT); _fwdT=setTimeout(renderCogs,300); };
   document.querySelectorAll("#cogsTable th[data-sort]").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; const cur=STATE.cogsSort||{key:"tot",dir:-1};
     STATE.cogsSort={key:k,dir:cur.key===k?-cur.dir:-1}; renderCogsTable(); });
@@ -2377,11 +2414,13 @@ function renderSrtDetail(){
 async function ensureCostData(){
   if(!GRP_LOADED.cost){
     $("cogsLoading").classList.remove("hidden");
-try{ const need=["DML_Cost_Daily","Consumption_Master","DML_Gas_Daily"];
+try{ const need=["DML_Cost_Daily","Consumption_Master","DML_Gas_Daily","CK_FG_Transfer","CK_FG_Production"];
       const res=await getTabsBatch(need);
       need.forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
       (STATE.data.DML_Cost_Daily||[]).forEach(r=>r.Unit=normUnit(r.Unit));
       (STATE.data.Consumption_Master||[]).forEach(r=>{ r.Unit_Beban=normUnit(r.Unit_Beban); r.Unit_Sumber=normUnit(r.Unit_Sumber); });
+      // baris manual FG CK -> bentuk kolom sama dgn Consumption_Master (downstream tak berubah)
+      STATE.data.CK_FG_Rows=(STATE.data.CK_FG_Transfer||[]).map(r=>({Tanggal:r.Date,Unit_Beban:normUnit(r.Unit),Unit_Sumber:"CK",Tipe:"TRANSFER",ArtNo:String(r.Art_No||""),Description:r.Description,Kategori:"FOOD",Qty:Number(r.Qty)||0,Amount:Number(r.Amount)||0,Flag_Status:"",Src:"MANUAL"}));
       GRP_LOADED.cost=true; initCogsFilters(); ensureFreshness();
     }catch(e){ $("cogsBanner").innerHTML='<div class="cogs-banner warn">Gagal memuat COGS: '+e.message+'</div>'; return; }
     finally{ $("cogsLoading").classList.add("hidden"); } }
@@ -2390,11 +2429,143 @@ try{ const need=["DML_Cost_Daily","Consumption_Master","DML_Gas_Daily"];
 document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>showGroup(b.dataset.grp));
 document.querySelectorAll("#ctabs .chip").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#ctabs .chip").forEach(x=>x.classList.toggle("active",x===b));
-  ["summary","dml","srt"].forEach(t=>$("ctab-"+t).style.display=(b.dataset.ct===t?"":"none"));
+  ["summary","dml","srt","ck"].forEach(t=>$("ctab-"+t).style.display=(b.dataset.ct===t?"":"none"));
   renderCogsTotal();
   if(b.dataset.ct==="srt")renderSrt();
+  if(b.dataset.ct==="ck")renderCkTab();
 });
 
+
+/* ===== CK sub-tab (prefix ckt) — production, transfer out, input vs output ===== */
+function cktInRange(t){ const {from,to}=cogsRange(); return t>=from&&t<=to; }
+function cktProdRows(){ return (STATE.data.CK_FG_Production||[]).filter(r=>cktInRange(dstr(r.Date))); }
+function cktTrfRows(){ return (STATE.data.CK_FG_Transfer||[]).filter(r=>cktInRange(dstr(r.Date))); }
+function cktDmlRows(){ return (STATE.data.DML_Cost_Daily||[]).filter(r=>String(r.Unit).trim()==="CK"&&cktInRange(dstr(r.Tanggal))); }
+function cktInitRows(){ return (STATE.data.Consumption_Master||[]).filter(r=>{
+  if(String(r.Unit_Beban||"").trim()!=="CK")return false;
+  if(String(r.Tipe||"").toUpperCase()!=="INITIAL")return false;
+  const k=String(r.Kategori||"").toUpperCase(); if(k!=="FOOD"&&k!=="BEVERAGE")return false;
+  if(isFgCK(r))return false; // FG hasil sendiri bukan bahan baku
+  return cktInRange(dstr(r.Tanggal)); }); }
+function cktKpiCard(label,val,sub){ return `<div class="kpi"><div class="k-label">${label}</div><div class="k-val">${val}</div>${sub?`<div class="muted" style="font-size:11px">${sub}</div>`:""}</div>`; }
+function renderCkTab(){ if(!$("ctab-ck")||$("ctab-ck").style.display==="none")return;
+  const prod=cktProdRows(), trf=cktTrfRows(), dml=cktDmlRows(), ini=cktInitRows();
+  const sum=a=>a.reduce((x,r)=>x+(Number(r.Amount)||0),0);
+  const tProd=sum(prod), tTrf=sum(trf), tDml=sum(dml), tIni=sum(ini);
+  const gm=gasOn()?gasMap():null; const {from,to}=cogsRange();
+  const tGas=gm?gasAmt(gm,"CK",from,to):0;
+  const tIn=tDml+tIni+tGas;
+  $("cktKpi").innerHTML=
+    cktKpiCard("Total Production",moneyFull(tProd),fmt(prod.length)+" rows")+
+    cktKpiCard("Total Transfer Out",moneyFull(tTrf),fmt(trf.length)+" rows")+
+    cktKpiCard("Net (Prod \u2212 Trf)",moneyFull(tProd-tTrf),"kenaikan stok FG teoritis periode ini")+
+    cktKpiCard("Days With Activity",fmt(new Set([...prod,...trf].map(r=>dstr(r.Date))).size),"");
+  // tabel harian
+  const day={};
+  prod.forEach(r=>{const t=dstr(r.Date);(day[t]=day[t]||{p:0,f:0}).p+=Number(r.Amount)||0;});
+  trf.forEach(r=>{const t=dstr(r.Date);(day[t]=day[t]||{p:0,f:0}).f+=Number(r.Amount)||0;});
+  const dates=Object.keys(day).sort().reverse();
+  $("cktDayBody").innerHTML=dates.map(t=>
+    `<tr><td>${t}</td><td class="rt">${moneyFull(day[t].p)}</td><td class="rt">${moneyFull(day[t].f)}</td>`+
+    `<td class="rt">${moneyFull(day[t].p-day[t].f)}</td>`+
+    `<td><button class="chip" style="padding:2px 10px" onclick="openCktDay('${t}')">detail</button></td></tr>`).join("")
+    ||'<tr><td colspan="5" class="muted">Belum ada data CK_FG pada periode ini. Jalankan Daily Sync di spreadsheet CK.</td></tr>';
+  if(dates.length) $("cktDayBody").innerHTML+=`<tr style="font-weight:700;border-top:2px solid var(--line)"><td>Total ${fmt(dates.length)} hari</td><td class="rt">${moneyFull(tProd)}</td><td class="rt">${moneyFull(tTrf)}</td><td class="rt">${moneyFull(tProd-tTrf)}</td><td></td></tr>`;
+  // komparasi input vs output
+  const ratio=tProd>0?(tIn/tProd*100):null;
+  $("cktCmpKpi").innerHTML=
+    cktKpiCard("Raw Input (period)",moneyFull(tIn),"DML + Store INITIAL"+(gm?" + gas":""))+
+    cktKpiCard("FG Output (period)",moneyFull(tProd),"nilai produksi, harga internal")+
+    cktKpiCard("Input / Output",ratio===null?"\u2014":(Math.round(ratio*10)/10)+"%","harian noisy \u2014 baca akumulasi");
+  const rowBtn=(fn,lb)=>`<button class="chip" style="padding:2px 10px" onclick="${fn}">${lb||"detail"}</button>`;
+  $("cktCmpBody").innerHTML=
+    `<tr><td>DML CK (direct purchase)</td><td class="rt">${moneyFull(tDml)}</td><td>${rowBtn("openCktDml()")}</td></tr>`+
+    (gm?`<tr><td>Gas 50kg (toggle on)</td><td class="rt">${moneyFull(tGas)}</td><td></td></tr>`:"")+
+    `<tr><td>Store INITIAL non-FG</td><td class="rt">${moneyFull(tIni)}</td><td>${rowBtn("openCktIni()")}</td></tr>`+
+    `<tr style="font-weight:700"><td>Total Input</td><td class="rt">${moneyFull(tIn)}</td><td></td></tr>`+
+    `<tr><td>FG Production Output</td><td class="rt">${moneyFull(tProd)}</td><td>${rowBtn("openCktProd()")}</td></tr>`;
+}
+/* popup generik CK: search + sort per kolom
+   col: {k, label, rt(bool: kolom angka), val(r) -> nilai sort/filter, fmt(r) -> tampilan} */
+let CKT_PU=null;
+function cktPuOpen(title,sub,rows,cols,defKey,defDir){
+  CKT_PU={rows,cols,q:"",sort:{k:defKey,dir:defDir||-1}};
+  openOverlay(title,sub); cktPuRender();
+}
+function cktPuRender(){ if(!CKT_PU)return;
+  const P=CKT_PU, q=P.q.toLowerCase();
+  let rows=P.rows;
+  if(q) rows=rows.filter(r=>P.cols.some(c=>!c.rt&&String(c.val(r)).toLowerCase().includes(q)));
+  const sc=P.cols.find(c=>c.k===P.sort.k);
+  if(sc) rows=rows.slice().sort((a,b)=>{ const x=sc.val(a),y=sc.val(b);
+    return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*P.sort.dir; });
+  const arrow=c=>c.k===P.sort.k?(P.sort.dir>0?" \u25b4":" \u25be"):"";
+  const head=P.cols.map(c=>`<th${c.rt?' class="rt"':''} style="cursor:pointer" onclick="cktPuSort('${c.k}')">${c.label}${arrow(c)}</th>`).join("");
+  const body=rows.map(r=>`<tr>${P.cols.map(c=>`<td${c.rt?' class="rt"':''}>${c.fmt(r)}</td>`).join("")}</tr>`).join("")
+    ||`<tr><td colspan="${P.cols.length}" class="muted">Tak ada data pada filter ini.</td></tr>`;
+  const tot=P.cols.map(c=>c.sum?`<td class="rt"><b>${moneyFull(rows.reduce((s,r)=>s+(Number(c.val(r))||0),0))}</b></td>`:(c===P.cols[0]?`<td><b>Total ${fmt(rows.length)} baris</b></td>`:"<td></td>")).join("");
+  $("puBody").innerHTML=
+    `<div style="margin-bottom:8px"><input id="cktPuQ" type="search" placeholder="search\u2026" class="dml-search" value="${P.q.replace(/"/g,"&quot;")}" oninput="CKT_PU.q=this.value;cktPuRender();cktPuFocus()"></div>`+
+    `<table class="daytbl"><thead><tr>${head}</tr></thead><tbody>${body}`+
+    (rows.length?`<tr style="font-weight:700;border-top:2px solid var(--line)">${tot}</tr>`:"")+`</tbody></table>`;
+}
+function cktPuFocus(){ const e=$("cktPuQ"); if(e){ const v=e.value; e.focus(); e.setSelectionRange(v.length,v.length); } }
+function cktPuSort(k){ const P=CKT_PU; if(!P)return;
+  P.sort=P.sort.k===k?{k,dir:-P.sort.dir}:{k,dir:-1}; cktPuRender(); }
+function cktAggItem(rows,dateF){ const m={};
+  rows.forEach(r=>{ const k=String(r.Art_No||r.ArtNo||"")+"|"+String(r.Description||"");
+    (m[k]=m[k]||{art:String(r.Art_No||r.ArtNo||""),desc:String(r.Description||""),qty:0,amt:0,last:""});
+    m[k].qty+=Number(r.Qty)||0; m[k].amt+=Number(r.Amount)||0;
+    const t=dstr(dateF(r)); if(t>m[k].last)m[k].last=t; });
+  return Object.values(m); }
+function openCktDay(t){
+  const p=(STATE.data.CK_FG_Production||[]).filter(r=>dstr(r.Date)===t);
+  const f=(STATE.data.CK_FG_Transfer||[]).filter(r=>dstr(r.Date)===t);
+  openOverlay("CK Daily Detail "+t,"Production & Transfer Out per item");
+  const mk=(title,rows,unitCol)=>`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">${title}</div>`+
+    `<table class="daytbl"><thead><tr><th>Art_No</th><th>Item</th>${unitCol?"<th>To Unit</th>":""}<th class="rt">Qty</th><th class="rt">Price</th><th class="rt">Amount</th></tr></thead><tbody>`+
+    (rows.map(r=>`<tr><td>${r.Art_No||""}</td><td>${r.Description||""}</td>${unitCol?`<td>${r.Unit||""}</td>`:""}<td class="rt">${fmtQty(r.Qty)}</td><td class="rt">${moneyFull(Number(r.Price)||0)}</td><td class="rt">${moneyFull(Number(r.Amount)||0)}</td></tr>`).join("")||`<tr><td colspan="${unitCol?6:5}" class="muted">Tak ada.</td></tr>`)+
+    `</tbody></table></div>`;
+  $("puBody").innerHTML=mk("Production",p,false)+mk("Transfer Out",f.sort((a,b)=>String(a.Unit).localeCompare(String(b.Unit))),true);
+}
+const ITEM_COLS=[
+  {k:"art",label:"Art_No",val:r=>r.art,fmt:r=>r.art},
+  {k:"desc",label:"Item",val:r=>r.desc,fmt:r=>r.desc},
+  {k:"qty",label:"Qty",rt:1,val:r=>r.qty,fmt:r=>fmtQty(r.qty)},
+  {k:"amt",label:"Amount",rt:1,sum:1,val:r=>r.amt,fmt:r=>moneyFull(r.amt)},
+  {k:"last",label:"Last",val:r=>r.last,fmt:r=>r.last||"\u2014"}];
+function openCktProd(){ const {from,to}=cogsRange();
+  cktPuOpen("CK FG Production \u2014 per item",from+" s/d "+to,
+    cktAggItem(cktProdRows(),r=>r.Date),ITEM_COLS,"amt",-1);
+}
+function openCktIni(){ const {from,to}=cogsRange();
+  cktPuOpen("CK Store INITIAL (non-FG) \u2014 bahan baku dari store sendiri",from+" s/d "+to,
+    cktAggItem(cktInitRows(),r=>r.Tanggal),ITEM_COLS,"amt",-1);
+}
+async function openCktDml(){ const {from,to}=cogsRange();
+  openOverlay("DML CK \u2014 direct purchase",from+" s/d "+to);
+  $("puBody").innerHTML='<div class="cogs-loading"><span class="spin"></span> Memuat detail DML CK\u2026</div>';
+  // DML_Cost_Daily hanya agregat harian; detail item via getDMLDetail (lazy, cache per bulan, unit CK saja)
+  STATE.cktDmlM=STATE.cktDmlM||{};
+  const curM=(STATE.lastActualDate||"").slice(0,7); const failed=[];
+  for(const m of monthsBetween(from,to)){
+    if(STATE.cktDmlM[m]&&m!==curM) continue;
+    try{ const r=await api({action:"getDMLDetail",token:STATE.token,from:m+"-01",to:monthEnd(m),units:["CK"]});
+      if(r.ok) STATE.cktDmlM[m]=rowsToObjs(r.headers,r.rows).filter(x=>String(x.Unit).trim()==="CK");
+      else { failed.push(m); delete STATE.cktDmlM[m]; }
+    }catch(e){ failed.push(m); delete STATE.cktDmlM[m]; }
+  }
+  const rows=monthsBetween(from,to).flatMap(m=>STATE.cktDmlM[m]||[])
+    .filter(r=>{ const t=dstr(r.Tanggal); return t>=from&&t<=to; });
+  cktPuOpen("DML CK \u2014 direct purchase"+(failed.length?" (bulan gagal dimuat: "+failed.join(", ")+")":""),from+" s/d "+to,rows,[
+    {k:"tgl",label:"Date",val:r=>dstr(r.Tanggal),fmt:r=>dstr(r.Tanggal)},
+    {k:"item",label:"Item",val:r=>String(r.Nama_Item||""),fmt:r=>r.Nama_Item||""},
+    {k:"kat",label:"Category",val:r=>String(r.Kategori||""),fmt:r=>r.Kategori||""},
+    {k:"sup",label:"Supplier",val:r=>String(r.Supplier||""),fmt:r=>r.Supplier||""},
+    {k:"qty",label:"Qty",rt:1,val:r=>Number(r.Qty)||0,fmt:r=>fmtQty(r.Qty)},
+    {k:"amt",label:"Amount",rt:1,sum:1,val:r=>Number(r.Amount)||0,fmt:r=>moneyFull(Number(r.Amount)||0)}],
+    "tgl",-1);
+}
 
 /* =========================================================
    MENU SALES (sub-tab Revenue) — prefix ms
