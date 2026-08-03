@@ -448,6 +448,13 @@ function detTable(u,taskId,det){
   det.forEach(function(d){h+=detRow(d);});
   return h+'</table><div style="margin:8px 0"><button class="mGhost" onclick="saveNotes(\''+u+'\',\''+taskId+'\')">Simpan Catatan</button></div>';
 }
+function ia3Var(u){ /* selisih input vs TB; null bila TB belum ada */
+  const F=S.files[u]||{};
+  const csc=F.tb&&F.tb.accounts['1110-10999']?F.tb.accounts['1110-10999'].end:null;
+  if(csc==null)return null;
+  let tot=0;detOf(u,'IA-3').forEach(function(d){tot+=Number(d.aging)||0;});
+  return tot-csc;
+}
 function ia3Body(u,taskId,st,det,needN){
   const F=S.files[u]||{};
   const csc=F.tb&&F.tb.accounts['1110-10999']?F.tb.accounts['1110-10999'].end:null;
@@ -472,7 +479,8 @@ function ia3Body(u,taskId,st,det,needN){
   h+='<div id="csRows_'+u+'">'+csRow(u,0)+csRow(u,1)+csRow(u,2)+'</div>';
   h+='<div style="margin:8px 0"><button class="mGhost" onclick="addCsRow(\''+u+'\')">+ Baris</button> '+
      '<button class="mBtn" onclick="saveOmset(\''+u+'\')">Simpan Semua</button></div>';
-  h+=statusCtl(u,taskId,st,needN);
+  const v3=ia3Var(u);
+  h+=statusCtl(u,taskId,st,needN,(v3!=null&&Math.abs(v3)>TOL)?1:0);
   return h;
 }
 function csRow(u,i){
@@ -553,6 +561,7 @@ async function approveTask(u,taskId){
 async function setTaskStatus(u,taskId,st){
   if((st==='DONE'||st==='WAITING_BK')&&flaggedNoNote(u,taskId).length){toast('Isi catatan item berflag dulu');return;}
   if(st==='DONE'&&openVariance(u,taskId)){toast('Masih ada selisih — task ini wajib nol');return;}
+  if(st==='DONE'&&taskId==='IA-3'){const v3=ia3Var(u);if(v3!=null&&Math.abs(v3)>TOL){toast('Input omset belum cocok dengan saldo TB 1110-10999');return;}}
   const L=logOf(u,taskId);
   await api({action:'updateTask',period:sel(),unit:u,taskId:taskId,status:st,note:L?L[6]:''});
   toast(taskId+' &rarr; '+st.replace('_',' '));await loadState();
