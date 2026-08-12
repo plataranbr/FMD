@@ -2629,6 +2629,8 @@ async function msFetchItems(fetchUnits){               // chunk <=6 sesuai limit
       const chunk = need.slice(i,i+6);
       const r = await api({action:"menuItems", token:STATE.token, units:chunk});
       if(!r.ok) throw new Error(r.error||"menuItems gagal");
+      if(r.meta && r.meta.skippedStaleMonthly) $("msWarn").innerHTML =
+        '<div class="cogs-banner warn">Menu_Sales_Monthly basi: '+r.meta.skippedStaleMonthly+' baris diabaikan, dipakai Menu_Sales_Current.</div>';
       chunk.forEach(u=>MS.items[u]=[]);
       r.data.forEach(row=>{
         const o = {Month:String(row[0]).slice(0,7), Unit:String(row[1]).trim(),
