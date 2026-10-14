@@ -86,7 +86,7 @@ FMD.page("cost/dml", {
       const more = host.querySelector("#dmMore"); if (more) more.onclick = () => { DMU.preset = "custom"; DMU.from = prevM + "-01"; draw(); ensure(); };
 
       // ---- rasio per unit ----
-      const P = (key, cat) => r => csPill(r[key], Cost.target("DML", cat, r.revFood, r.revBev));
+      const P = (key, cat) => r => r.ck ? csPill(r[key], 1) : csPillBtn(r[key], Cost.target("DML", cat, r.revFood, r.revBev), r.unit, cat || "T");
       const rr = sumRows.map(r => ({ ...r, f: r.dmlK + r.dmlE, b: r.dmlB, pf: r.revFood > 0 ? (r.dmlK + r.dmlE) / r.revFood : null, pb: r.revBev > 0 ? r.dmlB / r.revBev : null, pt: r.revTot > 0 ? r.dml / r.revTot : null }));
       const rt = UI.table([
         { key: "unit", label: t("Unit"), render: r => `<b>${esc(r.unit)}</b>${r.ck ? " " + UI.tag(t("no revenue · excl."), "mute") : ""}<div class="muted" style="font-size:11px">${esc(r.name || "")}</div>` },
@@ -96,6 +96,7 @@ FMD.page("cost/dml", {
       ], { rows: rr, full: true, emptyText: t("No cost data for the selected filters."), onRow: r => { if (r.ck) return; DMU.unit = DMU.unit === r.unit ? "ALL" : r.unit; draw(); },
         total: () => ({ unit: t("Total (excl. CK)"), f: T.cF, revFood: T.rF, pf: T.pctF, b: T.cB, revBev: T.rB, pb: T.pctB, dml: T.tot, revTot: T.rev, pt: T.pct }) });
       host.querySelector("#dmRatio .card-b").appendChild(rt);
+      const dayBox = UI.node(`<section class="card" style="display:none"></section>`); host.querySelector("#dmRatio").after(dayBox); wireDayPills(rt, dayBox, o, "DML");
       const trT = rt.querySelector("tr.total"); if (trT) { const tds = trT.querySelectorAll("td"); tds[3].innerHTML = csPill(T.pctF, T.tgtF); tds[6].innerHTML = csPill(T.pctB, T.tgtB); tds[9].innerHTML = csPill(T.pct, T.tgt); }
 
       if (!have) { ["#dmTop", "#dmLines"].forEach(s => (host.querySelector(s + " .card-b").innerHTML = loadErr ? UI.empty(t("Purchase lines are not available.")) : UI.skeleton(220))); return; }

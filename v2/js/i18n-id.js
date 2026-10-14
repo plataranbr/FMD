@@ -1,6 +1,16 @@
 /* Terjemahan ID. Kunci = teks English persis seperti di kode ({var} wajib dipertahankan). */
 "use strict";
 const I18N_ID = {
+  "Show daily detail": "Lihat rincian harian",
+  "Daily detail — {u}": "Rincian harian — {u}",
+  "daily ratios are indicative: purchases often cover several days": "rasio harian indikatif: belanja sering untuk beberapa hari",
+  "Store requisitions & CK": "Permintaan store & CK",
+  "Close": "Tutup",
+  "Detail for {u} only": "Rincian hanya untuk {u}",
+  "all units shown": "semua unit yang tampil",
+  "— select the row name for all units": "— pilih nama baris untuk semua unit",
+  "— select a unit’s value for that unit only": "— pilih nilai suatu unit untuk unit itu saja",
+  "No lines for this unit.": "Tidak ada baris untuk unit ini.",
   "{n} day ago": "{n} hari lalu",
   "{n} days ago": "{n} hari lalu",
   "% of rev.": "% pend.",

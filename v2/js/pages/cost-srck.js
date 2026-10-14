@@ -68,7 +68,7 @@ FMD.page("cost/sr-ck", {
 
       if (SRU.tab === "ratio") {
         note.textContent = t("Consumption only (own store + transfers in, including CK FG) against F&B revenue · target {g}. Units without their own store show transfers in only; combined DML + SR ratios are on the Summary page.", { g: fmtPct(COST_TGT.SRT.F, 0) });
-        const P = (key, cat) => r => csPill(r[key], Cost.target("SRT", cat, r.revFood, r.revBev));
+        const P = (key, cat) => r => r.ck ? csPill(r[key], 1) : csPillBtn(r[key], Cost.target("SRT", cat, r.revFood, r.revBev), r.unit, cat || "T");
         const tb = UI.table([
           { key: "unit", label: t("Unit"), render: r => `<b>${esc(r.unit)}</b>${r.ck ? " " + UI.tag(t("no revenue · excl."), "mute") : ""}${r.inc ? " " + UI.tag("INC", "crit") : ""}<div class="muted" style="font-size:11px">${esc(r.name || "")}</div>` },
           { key: "F", label: t("Food cost"), type: "money" }, { key: "revFood", label: t("Food revenue"), type: "money" }, { key: "pf", label: t("Food %"), type: "pct", render: P("pf", "F") },
@@ -78,6 +78,7 @@ FMD.page("cost/sr-ck", {
         ], { rows: ratio, full: true, emptyText: t("No requisitions for the selected filters."), onRow: r => { if (!r.ck) { SRU.unit = r.unit; SRU.tab = "top"; draw(); } },
           total: () => ({ unit: t("Total (excl. CK)"), F: T.cF, revFood: T.rF, pf: T.pctF, B: T.cB, revBev: T.rB, pb: T.pctB, tot: T.tot, revTot: T.rev, pt: T.pct, fg: ratio.filter(r => !r.ck).reduce((s, r) => s + r.fg, 0) }) });
         box.appendChild(tb);
+        const dayBox = UI.node(`<section class="card" style="display:none;margin-top:14px;padding:0"></section>`); box.appendChild(dayBox); wireDayPills(tb, dayBox, o, "SRT");
         const tr = tb.querySelector("tr.total"); if (tr) { const td = tr.querySelectorAll("td"); td[3].innerHTML = csPill(T.pctF, T.tgtF); td[6].innerHTML = csPill(T.pctB, T.tgtB); td[9].innerHTML = csPill(T.pct, T.tgt); }
       } else if (SRU.tab === "top") {
         note.textContent = t("Highest-value consumption items for the selected units and period. Compare the same item across units on the Cross-Unit Comparison page.");

@@ -2,7 +2,7 @@
 "use strict";
 
 const CVS = { month: "", cluster: "ALL", unit: "ALL",
-  L: { g: "food", src: "both", n: 10, q: "", sel: new Set() }, R: { g: "food", cat: "ALL", n: 10, q: "", sel: new Set() } };
+  L: { g: "food", src: "both", n: 10, q: "", sel: new Set(), dept: new Set(["KITCHEN", "BAR"]) }, R: { g: "food", cat: "ALL", n: 10, q: "", sel: new Set() } };
 const isBevFb = fb => /BEV|WINE|SPIRIT|BEER/i.test(fb || "");
 
 FMD.page("cost/cons-sales", {
@@ -32,11 +32,11 @@ FMD.page("cost/cons-sales", {
 
       // ---- kiri: konsumsi ----
       const L = {};
-      const addL = (name, cat, bev, src, qty, amt) => { const k = name.toUpperCase().trim(); if (!k) return; const x = (L[k] = L[k] || { name: k, cat, bev, src: new Set(), qty: 0, amt: 0, srcAmt: {} });
+      const addL = (name, cat, bev, src, qty, amt, dept) => { if (!CVS.L.dept.has(dept)) return; const k = name.toUpperCase().trim(); if (!k) return; const x = (L[k] = L[k] || { name: k, cat, bev, src: new Set(), qty: 0, amt: 0, srcAmt: {} });
         x.src.add(src); x.qty += qty; x.amt += amt; x.srcAmt[src] = (x.srcAmt[src] || 0) + amt; };
-      Cost.consDetail(o, "FB").forEach(r => addL(String(r.Description || ""), t("Store req."), String(r.Kategori).toUpperCase() === "BEVERAGE", "SR", Number(r.Qty) || 0, Number(r.Amount) || 0));
+      Cost.consDetail(o, "FB").forEach(r => addL(String(r.Description || ""), t("Store req."), String(r.Kategori).toUpperCase() === "BEVERAGE", "SR", Number(r.Qty) || 0, Number(r.Amount) || 0, String(r.Kategori).toUpperCase() === "BEVERAGE" ? "BAR" : "KITCHEN"));
       const dmlOk = DmlDetail.byMonth && DmlDetail.byMonth[CVS.month];
-      if (dmlOk) DmlDetail.rows([CVS.month]).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !K.has(r._k)) return; addL(String(r.Nama_Item || ""), String(r.Kategori || ""), r.Bucket === "BAR", "DML", r.Qty, r._amt || 0); });
+      if (dmlOk) DmlDetail.rows([CVS.month]).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !K.has(r._k)) return; addL(String(r.Nama_Item || ""), String(r.Kategori || ""), r.Bucket === "BAR", "DML", r.Qty, r._amt || 0, r.Bucket); });
       const leftAll = Object.values(L).map(x => ({ ...x, amt: CVS.L.src === "both" ? x.amt : (x.srcAmt[CVS.L.src === "dml" ? "DML" : "SR"] || 0) })).filter(x => x.amt !== 0);
 
       // ---- kanan: penjualan menu ----
@@ -90,7 +90,11 @@ FMD.page("cost/cons-sales", {
           shown.map(x => ({ ...x, unit: x.unit || "", sel: P.sel.has(x.name + "|" + (x.unit || "")) ? "Y" : "" })))).then(() => UI.toast(t("Copied {n} rows — paste into Excel", { n: fmtInt(shown.length) })));
         tl.appendChild(cp);
         ff.appendChild(UI.seg([["food", t("Food")], ["bev", t("Beverage")], ["all", t("All")]], P.g, v => { P.g = v; P.cat = "ALL"; draw(); }, t("Group")));
-        if (isL) ff.appendChild(UI.seg([["both", t("DML + SR")], ["dml", "DML"], ["sr", "SR"]], P.src, v => { P.src = v; draw(); }, t("Source")));
+        if (isL) { ff.appendChild(UI.seg([["both", t("DML + SR")], ["dml", "DML"], ["sr", "SR"]], P.src, v => { P.src = v; draw(); }, t("Source")));
+          const dg = UI.node(`<div class="chips" role="group" aria-label="${esc(t("Department"))}"></div>`);
+          [["KITCHEN", t("Kitchen")], ["BAR", t("Bar")], ["EVENT", t("Event")]].forEach(([k, l]) => { const b = UI.node(`<button type="button" class="chip" aria-pressed="${P.dept.has(k)}">${esc(l)}</button>`);
+            b.onclick = () => { if (P.dept.has(k) && P.dept.size > 1) P.dept.delete(k); else P.dept.add(k); P.sel.clear(); draw(); }; dg.appendChild(b); });
+          ff.appendChild(dg); }
         else ff.appendChild(UI.select(t("Category"), [["ALL", t("All categories")]].concat(cats.map(c => [c, c])), P.cat, v => { P.cat = v; draw(); }));
         ff.appendChild(UI.seg([[10, "Top 10"], [20, "20"], [50, "50"], [0, t("All")]], P.n, v => { P.n = +v; draw(); }, t("Rows shown")));
         let qT; el.querySelector("input[type=search]").addEventListener("input", e => { clearTimeout(qT); qT = setTimeout(() => { P.q = e.target.value.trim(); draw();

@@ -268,3 +268,55 @@ function costPeriodControls(host, st, redraw, opts = {}) {
   host.appendChild(dIn(t("From"), R.from, v => (st.from = v))); host.appendChild(dIn(t("To"), R.to, v => (st.to = v)));
   return R;
 }
+
+/* ---------- nama kategori beban: buang prefix departemen (TIGADARI/POMEC/S&M/HRD), satukan nama terpotong ---------- */
+const SUP_PREFIX = /^(TIGADARI|POMEC|S&M|HRD)\s+/i;
+function supCategory(name) {
+  const all = memo("cost|supcanon", () => {
+    const base = new Set((STATE.data.Consumption_Master || []).filter(r => coaClass(r) === "SUP").map(r => String(r.Kategori || "").replace(/\s+/g, " ").trim().toUpperCase().replace(SUP_PREFIX, "")).filter(Boolean));
+    const list = [...base].sort((a, b) => b.length - a.length), canon = {};
+    // nama terpotong (36 karakter di sumber) / bentuk tunggal -> nama terpanjang yg diawali nama itu
+    list.forEach(n => { canon[n] = list.find(m => m.length > n.length && m.startsWith(n)) || n; });
+    return canon;
+  });
+  const n = String(name || "").replace(/\s+/g, " ").trim().toUpperCase().replace(SUP_PREFIX, "");
+  return all[n] || n || t("Uncategorised");
+}
+
+/* ---------- rincian harian per unit: biaya, revenue, % (Food & Beverage) ---------- */
+/** src: "DML" | "SRT" | "SUM" — o = opsi Cost (from,to,keys,gas,fgManual) */
+function costDailyRows(k, o, src) {
+  const D = Cost.dml(o).day[k] || {}, C = Cost.cons(o).day[k] || {}, rv = Cost.rev(k, o.from, o.to).days, rd = {};
+  rv.forEach(x => (rd[x.d] = x));
+  const out = [];
+  for (let d = o.from; d <= o.to; d = addDays(d, 1)) {
+    const dm = D[d] || {}, cs = C[d] || {}, r = rd[d] || {};
+    const fF = (src !== "SRT" ? (dm.K || 0) + (dm.E || 0) : 0) + (src !== "DML" ? cs.K || 0 : 0);
+    const fB = (src !== "SRT" ? dm.B || 0 : 0) + (src !== "DML" ? cs.B || 0 : 0);
+    const rF = r.f || 0, rB = r.b || 0;
+    if (!fF && !fB && !rF && !rB) continue;
+    out.push({ d, fc: !!r.fc, cF: fF, rF, pF: rF > 0 ? fF / rF : null, cB: fB, rB, pB: rB > 0 ? fB / rB : null, tot: fF + fB, rev: rF + rB, pT: rF + rB > 0 ? (fF + fB) / (rF + rB) : null });
+  }
+  return out;
+}
+/** tampilkan panel rincian harian di box (Element). cat: F|B|T menyorot kolom. */
+function renderCostDays(box, k, o, src, cat, onClose) {
+  const rows = costDailyRows(k, o, src), tg = COST_TGT[src];
+  const sum = (key) => rows.reduce((s, r) => s + r[key], 0);
+  const T = { d: t("Total"), cF: sum("cF"), rF: sum("rF"), cB: sum("cB"), rB: sum("rB"), tot: sum("tot"), rev: sum("rev") };
+  T.pF = T.rF > 0 ? T.cF / T.rF : null; T.pB = T.rB > 0 ? T.cB / T.rB : null; T.pT = T.rev > 0 ? T.tot / T.rev : null;
+  const P = (key, g) => r => csPill(r[key], g);
+  const lab = { DML: t("Direct purchases (DML)"), SRT: t("Store requisitions & CK"), SUM: t("DML + store requisitions") }[src];
+  box.innerHTML = `<div class="card-h"><div><h2>${esc(t("Daily detail — {u}", { u: k }))}</h2><div class="sub">${esc(lab + " · " + dateLabel(o.from) + " – " + dateLabel(o.to))} · ${esc(t("daily ratios are indicative: purchases often cover several days"))}</div></div><div class="card-tools"><button type="button" class="btn" data-x>${esc(t("Close"))}</button></div></div><div class="card-b"></div>`;
+  box.querySelector("[data-x]").onclick = onClose;
+  const hi = c => cat === c ? " ★" : "";
+  const tb = UI.table([
+    { key: "d", label: t("Date"), type: "date", render: r => esc(dateLabel(r.d)) + (r.fc ? " " + UI.tag(t("forecast"), "mute") : "") },
+    { key: "cF", label: t("Food cost") + hi("F"), type: "money" }, { key: "rF", label: t("Food revenue"), type: "money" }, { key: "pF", label: t("Food %"), type: "pct", render: P("pF", tg.F) },
+    { key: "cB", label: t("Bev. cost") + hi("B"), type: "money" }, { key: "rB", label: t("Bev. revenue"), type: "money" }, { key: "pB", label: t("Bev. %"), type: "pct", render: P("pB", tg.B) },
+    { key: "tot", label: t("Total cost") + hi("T"), type: "money" }, { key: "rev", label: t("F&B revenue"), type: "money" }, { key: "pT", label: t("F&B %"), type: "pct", render: P("pT", (tg.F + tg.B) / 2) },
+  ], { rows, full: true, total: () => T, emptyText: t("No cost data for the selected filters.") });
+  box.querySelector(".card-b").appendChild(tb);
+  const tr = tb.querySelector("tr.total"); if (tr) { const td = tr.querySelectorAll("td"); td[3].innerHTML = csPill(T.pF, tg.F); td[6].innerHTML = csPill(T.pB, tg.B); td[9].innerHTML = csPill(T.pT, (tg.F + tg.B) / 2); }
+  box.style.display = ""; box.scrollIntoView({ behavior: "smooth", block: "start" });
+}

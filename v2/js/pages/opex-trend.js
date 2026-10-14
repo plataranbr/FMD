@@ -16,7 +16,7 @@ FMD.page("opex/trend", {
       const sup = (STATE.data.Consumption_Master || []).filter(r => r.Unit_Beban && K.has(Cost.key(r.Unit_Beban)) && coaClass(r) === "SUP");
       const months = [...new Set(sup.map(r => r._d.slice(0, 7)))].sort();
       const lastData = sup.reduce((m, r) => r._d > m ? r._d : m, "");
-      const rowKey = r => OXT.by === "cat" ? String(r.Kategori || t("Uncategorised")) : Cost.key(r.Unit_Beban);
+      const rowKey = r => OXT.by === "cat" ? supCategory(r.Kategori) : Cost.key(r.Unit_Beban);
       const piv = {}, tot = {};
       sup.forEach(r => { const k = rowKey(r), m = r._d.slice(0, 7), a = Number(r.Amount) || 0; const p = (piv[k] = piv[k] || { k, total: 0 }); p[m] = (p[m] || 0) + a; p.total += a; tot[m] = (tot[m] || 0) + a; });
       const rev = {}; months.forEach(m => { const R = monthRange(m); rev[m] = keys.reduce((s, k) => s + Cost.rev(k, R.from, R.to).revAll, 0); });

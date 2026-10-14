@@ -40,7 +40,7 @@ function crossPage(id, cls) {
         F1.appendChild(UI.clusterSelect(S.cluster, v => { S.cluster = v; S.units = []; draw(); }));
         const ul = UI.node(`<div class="field">${esc(t("Units shown"))}</div>`);
         ul.appendChild(UI.unitPicker(avail, sc.sel.filter(k => avail.includes(k)), v => { S.units = v.length === avail.length ? [] : v; draw(); })); host.querySelector("#xUnits").appendChild(ul);
-        const segF = (lab, opts, key, after) => { const f = UI.node(`<label class="field">${esc(lab)}</label>`); f.appendChild(UI.seg(opts, S[key], v => { S[key] = v; S.open = ""; draw(); if (after) after(); }, lab)); F2.appendChild(f); };
+        const segF = (lab, opts, key, after) => { const f = UI.node(`<label class="field">${esc(lab)}</label>`); f.appendChild(UI.seg(opts, S[key], v => { S[key] = v; S.open = ""; S.openU = ""; draw(); if (after) after(); }, lab)); F2.appendChild(f); };
         if (S.cls === "COGS") segF(t("Source"), [["all", t("DML + SR")], ["dml", "DML"], ["sr", "SR"]], "src", ensure);
         segF(t("View"), [["cat", t("Category")], ["item", t("Item")]], "view");
         segF(t("Measure"), [["pct", t("% of revenue")], ["amt", t("Amount")]].concat(S.view === "item" ? [["qty", t("Qty")], ["price", t("Unit price")]] : []), "measure");
@@ -60,7 +60,7 @@ function crossPage(id, cls) {
             if (ms.every(m => DmlDetail.byMonth && DmlDetail.byMonth[m])) DmlDetail.rows(ms).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !o.keys.has(r._k)) return;
               lines.push({ k: r._k, cat: String(r.Kategori || t("Uncategorised")), item: String(r.Nama_Item || "").trim().toUpperCase(), bev: r.Bucket === "BAR", amt: r._amt || 0, qty: r.Qty, src: "DML", who: String(r.Supplier || "").trim(), price: r._p, d: r._d }); }); }
         } else {
-          Cost.consDetail(o, "SUP").forEach(r => lines.push({ k: Cost.key(r.Unit_Beban), cat: String(r.Kategori || t("Uncategorised")), item: String(r.Description || "").trim().toUpperCase(), bev: false, sup: true,
+          Cost.consDetail(o, "SUP").forEach(r => lines.push({ k: Cost.key(r.Unit_Beban), cat: supCategory(r.Kategori), item: String(r.Description || "").trim().toUpperCase(), bev: false, sup: true,
             amt: Number(r.Amount) || 0, qty: Number(r.Qty) || 0, src: "SR", who: r.Unit_Sumber || "", d: r._d, coa: COA_OF(r.COA) }));
         }
         const rev = {}; keys.forEach(k => (rev[k] = Cost.rev(k, R.from, R.to)));
@@ -119,23 +119,25 @@ function crossPage(id, cls) {
         if (!list.length) { box.innerHTML = UI.empty(loading ? t("Loading purchase lines…") : t("No data for the selected filters.")); return; }
         box.innerHTML = `<div class="tbl-wrap" style="max-height:none"><table class="tbl heat"><thead><tr><th>${esc(S.view === "item" ? t("Item") : t("Category"))}</th>${keys.map(k => `<th class="r">${esc(k)}</th>`).join("")}<th class="r">${esc(t("Median"))}</th></tr></thead><tbody>` +
           list.map((p, ri) => `<tr class="link-row" data-r="${ri}"><td><span class="caret">${S.open === p.name ? "▾" : "▸"}</span> <b>${esc(p.name)}</b><div class="muted" style="font-size:11px">${esc(S.view === "item" ? p.catMain : (p.bev ? t("Beverage") : S.cls === "SUP" ? t("Supplies") : t("Food")))} · ${esc([...p.src].join(" + "))}</div></td>` +
-            p.vals.map((v, i) => `<td class="r ${heat(p, i) ? "h-" + heat(p, i) : ""}"><span class="num">${esc(fv(v))}</span>${S.measure === "pct" && p.u[keys[i]] ? `<div class="muted" style="font-size:10.5px">${esc(fmt(p.u[keys[i]].amt))}</div>` : ""}</td>`).join("") +
+            p.vals.map((v, i) => `<td class="r ${heat(p, i) ? "h-" + heat(p, i) : ""}${S.open === p.name && S.openU === keys[i] ? " cell-on" : ""}" data-c="${i}" title="${esc(t("Detail for {u} only", { u: keys[i] }))}"><span class="num">${esc(fv(v))}</span>${S.measure === "pct" && p.u[keys[i]] ? `<div class="muted" style="font-size:10.5px">${esc(fmt(p.u[keys[i]].amt))}</div>` : ""}</td>`).join("") +
             `<td class="r"><span class="num">${esc(fv(p.med))}</span></td></tr>` + (S.open === p.name ? `<tr class="sub"><td colspan="${keys.length + 2}">${detail(p)}</td></tr>` : "")).join("") + `</tbody></table></div>
           <div class="tbl-foot"><span>${esc(t("Showing {a} of {b}", { a: fmtInt(list.length), b: fmtInt(totalRows) }))} · ${esc(t("Colour only where the unit’s revenue for the period is at least {v}.", { v: fmtRp(minRev) }))}</span></div>`;
-        box.querySelectorAll("tr[data-r]").forEach(tr => tr.onclick = () => { const p = list[+tr.dataset.r]; S.open = S.open === p.name ? "" : p.name; draw(); });
+        box.querySelectorAll("tr[data-r]").forEach(tr => tr.onclick = e => { const p = list[+tr.dataset.r], td = e.target.closest("td[data-c]"), u = td ? keys[+td.dataset.c] : "";
+          if (S.open === p.name && (S.openU || "") === u) { S.open = ""; S.openU = ""; } else { S.open = p.name; S.openU = u; } draw(); });
 
         function detail(p) {
-          const ls = lines.filter(l => (S.view === "item" ? l.item : l.cat) === p.name && o.keys.has(l.k));
+          const ls = lines.filter(l => (S.view === "item" ? l.item : l.cat) === p.name && (S.openU ? l.k === S.openU : o.keys.has(l.k)));
+          const head = `<div style="font-weight:600;margin-bottom:6px">${esc(p.name)} · ${esc(S.openU ? S.openU : t("all units shown"))}${S.openU ? ` <span class="muted" style="font-weight:400">${esc(t("— select the row name for all units"))}</span>` : ` <span class="muted" style="font-weight:400">${esc(t("— select a unit’s value for that unit only"))}</span>`}</div>`;
           if (S.view === "cat") {   // item terbesar dalam kategori
             const it = {}; ls.forEach(l => { const x = (it[l.item] = it[l.item] || { amt: 0, u: {} }); x.amt += l.amt; x.u[l.k] = (x.u[l.k] || 0) + l.amt; });
             const top = Object.entries(it).sort((a, b) => b[1].amt - a[1].amt).slice(0, 8);
-            return `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Largest items"))}</div>` + top.map(([n, x]) => { const big = Object.entries(x.u).sort((a, b) => b[1] - a[1])[0];
+            return head + `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Largest items"))}</div>` + top.map(([n, x]) => { const big = Object.entries(x.u).sort((a, b) => b[1] - a[1])[0];
               return `<div class="kv"><span>${esc(n)}</span><span class="num">${esc(fmt(x.amt))} <span class="muted">· ${esc(t("largest: {u}", { u: big[0] }))}</span></span></div>`; }).join("");
           }
           const w = {}; ls.forEach(l => { const key = l.src + "|" + l.who + "|" + l.k, x = (w[key] = w[key] || { src: l.src, who: l.who, k: l.k, amt: 0, qty: 0, last: "", price: null });
             x.amt += l.amt; x.qty += l.qty; if (l.d >= x.last) { x.last = l.d; if (l.price) x.price = l.price; } });
           const ws = Object.values(w).sort((a, b) => b.amt - a.amt).slice(0, 12), ps = ws.map(x => x.price).filter(v => v > 0), mn = ps.length ? Math.min(...ps) : null;
-          return `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Supplier (DML) or issuing store (SR)"))}</div>` + ws.map(x =>
+          return head + `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Supplier (DML) or issuing store (SR)"))}</div>` + (ws.length ? "" : UI.empty(t("No lines for this unit."))) + ws.map(x =>
             `<div class="kv"><span>${UI.tag(x.src, x.src === "DML" ? "info" : "mute")} ${esc(x.who || DASH)} → <b>${esc(x.k)}</b></span><span class="num">${esc(fmtNum(x.qty))} · ${esc(fmt(x.amt))}${x.price ? ` · ${esc(fmtInt(x.price))}` : ""}${mn != null && x.price && ps.length > 1 ? " " + (x.price === mn ? UI.tag(t("lowest"), "ok") : UI.tag("+" + fmtPct((x.price - mn) / mn, 0), "crit")) : ""} <span class="muted">· ${esc(dateLabel(x.last, true))}</span></span></div>`).join("");
         }
       };

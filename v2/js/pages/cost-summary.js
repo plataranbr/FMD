@@ -4,6 +4,13 @@
 const CSU = { preset: "mtd", cluster: "ALL", units: [], from: "", to: "", fwd: 0, gas: false, fgManual: true, src: "all", focus: "" };
 
 const csPct = p => p == null ? DASH : fmtPct(p, 1);
+/** pill yang bisa diklik -> rincian harian (data-u unit, data-c F|B|T) */
+const csPillBtn = (p, tgt, u, c) => p == null ? `<span class="muted">${DASH}</span>` : `<button type="button" class="pill b-${Cost.band(p, tgt)} num" data-u="${esc(u)}" data-c="${c}" title="${esc(t("Show daily detail"))}">${esc(fmtPct(p, 1))}</button>`;
+/** pasang klik pill pada tabel -> panel rincian harian */
+function wireDayPills(tbl, panel, o, src) {
+  tbl.addEventListener("click", e => { const b = e.target.closest("button.pill[data-u]"); if (!b) return;
+    renderCostDays(panel, b.dataset.u, o, src, b.dataset.c, () => { panel.style.display = "none"; panel.innerHTML = ""; }); });
+}
 const csPill = (p, tgt) => p == null ? `<span class="muted">${DASH}</span>` : `<span class="pill b-${Cost.band(p, tgt)} num">${esc(fmtPct(p, 1))}</span>`;
 
 function csRange() {
@@ -103,7 +110,7 @@ FMD.page("cost/summary", {
       gs.querySelector("input").onchange = e => { CSU.gas = e.target.checked; draw(); }; F2.appendChild(gs);
 
       // ---- tabel ----
-      const P = (key, cat) => r => csPill(r[key], Cost.target("SUM", cat, r.revFood, r.revBev));
+      const P = (key, cat) => r => r.ck ? csPill(r[key], 1) : csPillBtn(r[key], Cost.target("SUM", cat, r.revFood, r.revBev), r.unit, cat || "T");
       const unitCell = r => `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="dot" style="background:${r.rel === "RELIABLE" ? "var(--ok)" : r.rel === "INDICATIVE" ? "var(--warn)" : "var(--crit)"}" title="${esc(t("DML reliability: {r}", { r: r.rel.toLowerCase() }))}"></span><b>${esc(r.unit)}</b>${r.ck ? " " + UI.tag(t("no revenue · excl."), "mute") : ""}${r.incCons ? " " + UI.tag("INC", "crit") : ""}${CSU.focus === r.unit ? " " + UI.tag(t("focused"), "info") : ""}</div><div class="muted" style="font-size:11px">${esc(r.name)}</div>`;
       const totRow = () => ({ unit: t("Total (excl. CK)"), cF: T.cF, revFood: T.rF, pctFood: T.pctF, cB: T.cB, revBev: T.rB, pctBev: T.pctB, tot: T.tot, revTot: T.rev, pct: T.pct,
         dml: rows.filter(r => !r.ck).reduce((s, r) => s + r.dml, 0), srt: rows.filter(r => !r.ck).reduce((s, r) => s + r.srt, 0) });
@@ -119,6 +126,7 @@ FMD.page("cost/summary", {
       ];
       const tbl = UI.table(cols, { rows, sort: null, full: true, total: () => totRow(), onRow: r => { CSU.focus = CSU.focus === r.unit || r.ck ? "" : r.unit; draw(); }, emptyText: t("No cost data for the selected filters.") });
       host.querySelector("#csTbl .card-b").appendChild(tbl);
+      const dayBox = UI.node(`<section class="card" style="display:none"></section>`); host.querySelector("#csTbl").after(dayBox); wireDayPills(tbl, dayBox, o, "SUM");
       // pill di baris total (pakai target tertimbang)
       const tr = tbl.querySelector("tr.total"); if (tr) { const tds = tr.querySelectorAll("td");
         const idx = k => cols.filter(c => !c.hidden).findIndex(c => c.key === k);
