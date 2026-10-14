@@ -143,7 +143,8 @@ FMD.page("overview/summary", {
           <div class="card-h"><div><h2 id="chTitle"></h2><div class="sub" id="chSub"></div></div><div class="card-tools" id="chTools"></div></div>
           <div id="chLegend" class="chart-legend"></div>
           <div style="position:relative;height:280px"><canvas id="sumChart" role="img" aria-label="${esc(t("Revenue chart"))}"></canvas></div>
-        </section>`;
+        </section>
+        ${costCard()}`;
       host.querySelector(".filters").appendChild(UI.clusterSelect(SUM_UI.cluster, v => { SUM_UI.cluster = v; SUM_UI.outlet = "ALL"; SUM_UI.showAll = false; draw(); }));
       host.querySelectorAll("[data-sev]").forEach(b => b.onclick = () => { SUM_UI.sev = b.dataset.sev; SUM_UI.showAll = false; draw(); });
       const more = host.querySelector("#alertMore"); if (more) more.onclick = () => { SUM_UI.showAll = !SUM_UI.showAll; draw(); };
@@ -159,7 +160,27 @@ FMD.page("overview/summary", {
       $("chLegend").innerHTML = chartLegend(daily ? "daily" : "monthly");
       chart = daily ? dailyRevenueChart($("sumChart"), cRows) : monthlyRevenueChart($("sumChart"), cRows);
     };
+    // kartu Rasio Biaya F&B (bulan berjalan) — dimuat setelah revenue tampil, tidak menahan halaman
+    let costState = "loading";
+    function costCard() {
+      if (costState === "hidden") return "";
+      if (costState === "loading") return UI.card({ title: t("F&B Cost Ratio · month to date"), body: UI.skeleton(90) });
+      const R = { from: (STATE.lastActualDate || "").slice(0, 7) + "-01", to: STATE.lastActualDate };
+      const keys = Cost.allKeys().filter(k => !Cost.hidden(k) && !COST_CENTER_ONLY.has(k) && (SUM_UI.cluster === "ALL" || Cost.cluster(k) === SUM_UI.cluster));
+      const rows = Cost.summary({ from: R.from, to: R.to, gas: false, fgManual: true, keys: new Set(keys) }), T = Cost.totals(rows);
+      const above = rows.filter(r => !r.ck && r.pct != null && r.pct > Cost.target("SUM", null, r.revFood, r.revBev)).sort((a, b) => b.pct - a.pct);
+      const pill = (p, g) => p == null ? DASH : `<span class="pill b-${Cost.band(p, g)} num">${esc(fmtPct(p, 1))}</span>`;
+      return `<section class="card"><div class="card-h"><div><h2>${esc(t("F&B Cost Ratio · month to date"))}</h2><div class="sub">${esc(t("Provisional: direct purchases + store requisitions, excl. CK · {r}", { r: dateLabel(R.from) + " – " + dateLabel(R.to) }))}</div></div><div class="card-tools"><a href="#/cost/summary" style="font-size:13px">${esc(t("Open Cost of Sales"))}</a></div></div>
+        <div class="grid g4">
+          <div class="panel"><div class="muted" style="font-size:12px">${esc(t("F&B cost ratio"))}</div><div style="font-size:22px;font-weight:600">${pill(T.pct, T.tgt)}</div><div class="muted" style="font-size:12px">${esc(T.pct == null ? "" : t("{x} vs {g} target", { x: fmtPts(T.pct - T.tgt), g: fmtPct(T.tgt, 0) }))}</div></div>
+          <div class="panel"><div class="muted" style="font-size:12px">${esc(t("Food"))}</div><div style="font-size:22px;font-weight:600">${pill(T.pctF, T.tgtF)}</div><div class="muted num" style="font-size:12px">${esc(fmtRp(T.cF))}</div></div>
+          <div class="panel"><div class="muted" style="font-size:12px">${esc(t("Beverage"))}</div><div style="font-size:22px;font-weight:600">${pill(T.pctB, T.tgtB)}</div><div class="muted num" style="font-size:12px">${esc(fmtRp(T.cB))}</div></div>
+          <div class="panel"><div class="muted" style="font-size:12px">${esc(t("Units above target"))}</div><div style="font-size:22px;font-weight:600">${esc(t("{a} of {b}", { a: above.length, b: rows.filter(r => !r.ck && r.revTot > 0).length }))}</div><div class="muted" style="font-size:12px">${esc(above.slice(0, 4).map(r => r.unit + " " + fmtPct(r.pct, 0)).join(" · "))}</div></div>
+        </div></section>`;
+    }
     draw();
+    Cost.load("summary").then(r => { if (ctx.isStale()) return; costState = r.missing.some(m => m.tab === "DML_Cost_Daily") ? "hidden" : "ready"; draw(); })
+      .catch(() => { if (!ctx.isStale()) { costState = "hidden"; draw(); } });
     const onTheme = () => draw();
     document.addEventListener("fmd:theme", onTheme);
     return () => { document.removeEventListener("fmd:theme", onTheme); if (chart) chart.destroy(); };

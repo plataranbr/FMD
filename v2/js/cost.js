@@ -70,20 +70,20 @@ const Cost = {
   _rev(k, from, to) {
     const uset = new Set(this.members(k)), act = {}; let lastAct = "";
     (STATE.data.Revenue_Master || []).forEach(r => { if (!uset.has(String(r.Unit || "").trim())) return; const d = dstr(r.Tanggal); if (d < from || d > to) return;
-      const a = (act[d] = act[d] || { food: 0, bev: 0 }); a.food += Number(r.Food) || 0; a.bev += Number(r.Beverage) || 0; if (d > lastAct) lastAct = d; });
+      const a = (act[d] = act[d] || { food: 0, bev: 0, oth: 0 }); a.food += Number(r.Food) || 0; a.bev += Number(r.Beverage) || 0; a.oth += Number(r.Other) || 0; if (d > lastAct) lastAct = d; });
     const best = {};
     (STATE.data.Forecast_Output || []).forEach(r => { if (!uset.has(String(r.Unit || "").trim())) return; const td = dstr(r.Target_Date); if (td < from || td > to) return;
       const kk = (r.Outlet || "") + "|" + td, sd = dstr(r.Snapshot_Date); if (!best[kk] || sd > best[kk]._sd) best[kk] = { r, _sd: sd }; });
-    const fc = {}; Object.values(best).forEach(({ r }) => { const td = dstr(r.Target_Date), a = (fc[td] = fc[td] || { food: 0, bev: 0, event: 0 });
-      a.food += Number(r.Food_Reg) || 0; a.bev += Number(r.Bev_Reg) || 0; a.event += Number(r.Event) || 0; });
-    let food = 0, bev = 0, nAct = 0, nFc = 0; const days = [];
+    const fc = {}; Object.values(best).forEach(({ r }) => { const td = dstr(r.Target_Date), a = (fc[td] = fc[td] || { food: 0, bev: 0, event: 0, oth: 0 });
+      a.food += Number(r.Food_Reg) || 0; a.bev += Number(r.Bev_Reg) || 0; a.event += Number(r.Event) || 0; a.oth += Number(r.Other_Reg) || 0; });
+    let food = 0, bev = 0, oth = 0, nAct = 0, nFc = 0; const days = [];
     for (let d = from; d <= to; d = addDays(d, 1)) {
-      let f, b, isFc = false;
-      if (lastAct && d <= lastAct) { const a = act[d] || { food: 0, bev: 0 }; f = a.food; b = a.bev; nAct++; }   // aktual: Event sudah termasuk Food/Bev
-      else { const a = fc[d]; if (!a) continue; f = a.food + a.event; b = a.bev; isFc = true; nFc++; }       // forecast: Event aditif
-      food += f; bev += b; days.push({ d, rev: f + b, f, b, fc: isFc });
+      let f, b, x, isFc = false;
+      if (lastAct && d <= lastAct) { const a = act[d] || { food: 0, bev: 0, oth: 0 }; f = a.food; b = a.bev; x = a.oth; nAct++; }   // aktual: Event sudah termasuk Food/Bev
+      else { const a = fc[d]; if (!a) continue; f = a.food + a.event; b = a.bev; x = a.oth; isFc = true; nFc++; }       // forecast: Event aditif
+      food += f; bev += b; oth += x; days.push({ d, rev: f + b, f, b, fc: isFc });
     }
-    return { revFood: food, revBev: bev, revTot: food + bev, nAct, nFc, lastAct, days };
+    return { revFood: food, revBev: bev, revTot: food + bev, revAll: food + bev + oth, nAct, nFc, lastAct, days };
   },
 
   /* ---------- agregat ---------- o = {from,to,keys:Set,gas,fgManual} ---------- */
@@ -200,3 +200,71 @@ const DmlDetail = {
 };
 const cadKey = (u, mid, item) => String(u).trim() + "|" + (mid !== "" && mid != null ? mid : item);
 function cadenceMap() { return memo("cost|cad", () => { const m = {}; (STATE.data.DML_Cadence || []).forEach(r => { m[cadKey(Dim.norm(r.Unit), r.Mapping_ID, r.Nama_Item)] = r; }); return m; }); }
+
+/* ---------- helper bersama halaman cost lanjutan ---------- */
+const COA_OF = s => { const m = String(s || "").match(/^\s*(\d{4}-\d{5})/); return m ? m[1] : ""; };
+/** kelas baris konsumsi per COA: FOOD | BEV | SUP (non-COGS) | PRE (pre-opening) | BS (neraca) | "" (tanpa COA) */
+function coaClass(r) {
+  const c = COA_OF(r.COA), k = String(r.Kategori || "").toUpperCase();
+  if (!c) return k === "FOOD" ? "FOOD" : k === "BEVERAGE" ? "BEV" : "";
+  if (c.startsWith("5040-1001")) return "FOOD"; if (c.startsWith("5040-1002")) return "BEV";
+  if (/^7/.test(c)) return "SUP"; if (/^8081/.test(c)) return "PRE"; if (/^[12]/.test(c)) return "BS";
+  return k === "FOOD" ? "FOOD" : k === "BEVERAGE" ? "BEV" : "";
+}
+const SUBCAT_L = () => ({ RAW: t("Raw"), FG_KITCHEN: t("FG Kitchen"), FG_BAKERY: t("FG Bakery") });
+function subKategoriOf(r) {
+  if (String(r.Unit_Sumber || "").trim() !== "CK") return "RAW";
+  const a = String(r.ArtNo || ""); if (a.length !== 7) return "RAW";
+  if (/^111[789]/.test(a)) return "FG_KITCHEN"; if (/^112[01]/.test(a)) return "FG_BAKERY"; return "RAW";
+}
+/** baris Consumption_Master detail (wajib tab Consumption_Master termuat) sesuai filter cost; opt.cls = Set kelas COA */
+Cost.consDetail = function (o, cls = "FB") {
+  return memo("cost|cdet|" + this.sig(o) + "|" + cls, () => {
+    const M = STATE.data.Consumption_Master || [];
+    if (cls === "FB") {   // = logika Summary/FMD lama (Kategori FOOD/BEVERAGE), dari baris detail
+      let rows = M.filter(r => this.consFilter(r, o) && (!o.fgManual || !this.isFgCK(r)));
+      if (o.fgManual) rows = rows.concat((STATE.data.CK_FG_Rows || []).filter(r => this.consFilter(r, o)));
+      return rows;
+    }
+    return M.filter(r => {   // cls = kelas COA (SUP/PRE/BS)
+      const u = r.Unit_Beban; if (!u || !this.inKeys(o, u) || !(r._d >= o.from && r._d <= o.to)) return false;
+      return coaClass(r) === cls; });
+  });
+};
+/** opsi periode bulanan: bulan dgn data cost (DML/konsumsi) + bulan berjalan */
+function costMonths() {
+  const last = STATE.lastActualDate || dstr(new Date()), cur = last.slice(0, 7);
+  const set = new Set([cur]);
+  (STATE.data.DML_Cost_Daily || []).forEach(r => r._d && set.add(r._d.slice(0, 7)));
+  return [...set].filter(m => m <= cur).sort().reverse();
+}
+function monthRange(m) { const last = STATE.lastActualDate || ""; return { from: m + "-01", to: last.slice(0, 7) === m ? last : monthEnd(m) }; }
+/** filter unit cost bersama (cluster + picker) -> {avail, keys} */
+function costUnitScope(st) {
+  const avail = Cost.allKeys().filter(k => !Cost.hidden(k) && (st.cluster === "ALL" || Cost.cluster(k) === st.cluster)).sort((a, b) => Cost.order(a) - Cost.order(b));
+  const sel = (st.units || []).filter(k => avail.includes(k));
+  return { avail, keys: sel.length ? sel : avail, sel };
+}
+/** median */
+const medianOf = a => { const s = a.filter(isNum).slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
+COST_SETS.sr = ["DML_Cost_Daily", "Consumption_Master", "CK_FG_Transfer", "CK_FG_Production"];
+COST_SETS.cons = ["DML_Cost_Daily", "Consumption_Master", "CK_FG_Transfer", "DML_Cadence"];
+/** periode preset bersama: st = {preset, from, to} */
+function costRange(st) {
+  const last = STATE.lastActualDate || dstr(new Date()), m = last.slice(0, 7);
+  if (st.preset === "mtd") { st.from = m + "-01"; st.to = last; }
+  else if (st.preset === "prev") { const pm = addMonths(m, -1); st.from = pm + "-01"; st.to = monthEnd(pm); }
+  else if (st.preset === "3m") { st.from = addMonths(m, -2) + "-01"; st.to = last; }
+  if (!st.from) { st.from = m + "-01"; st.to = last; }
+  return { from: st.from, to: st.to };
+}
+function costPeriodControls(host, st, redraw, opts = {}) {
+  const R = costRange(st);
+  const pf = UI.node(`<label class="field">${esc(t("Period"))}</label>`);
+  const presets = [["mtd", t("Month to date")], ["prev", t("Last month")]].concat(opts.threeM ? [["3m", t("Last 3 months")]] : []).concat([["custom", t("Custom")]]);
+  pf.appendChild(UI.seg(presets, st.preset, v => { st.preset = v; redraw(); }, t("Period"))); host.appendChild(pf);
+  const dIn = (lab, val, on) => { const el = UI.node(`<label class="field">${esc(lab)}<input type="date" value="${esc(val)}"></label>`);
+    el.querySelector("input").addEventListener("change", e => { if (!e.target.value) return; st.preset = "custom"; on(e.target.value); redraw(); }); return el; };
+  host.appendChild(dIn(t("From"), R.from, v => (st.from = v))); host.appendChild(dIn(t("To"), R.to, v => (st.to = v)));
+  return R;
+}

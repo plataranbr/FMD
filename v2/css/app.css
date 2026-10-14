@@ -187,3 +187,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px}
 .stk i{height:100%}
 .sw{width:10px;height:10px;border-radius:3px;display:inline-block}
 .tbl tr.sub td{font-weight:400;color:var(--body);font-size:12px;border-top:none;padding-top:4px;padding-bottom:4px}
+.tbl.heat td.h-crit{background:var(--crit-bg)}.tbl.heat td.h-warn{background:var(--warn-bg)}.tbl.heat td.h-info{background:var(--info-bg)}
+.caret{display:inline-block;width:12px;color:var(--muted)}
+.cs-panel{display:flex;flex-direction:column;gap:10px;min-width:0}
+.cs-row{display:grid;grid-template-columns:26px minmax(0,1fr) 70px 110px 64px;gap:8px;align-items:center;padding:7px 6px;border-radius:12px;font-size:12.5px;cursor:pointer;min-height:42px}
+.cs-row.on{background:var(--info-bg)}.cs-row input{width:17px;height:17px;margin:0}
+.cs-head{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:600;color:var(--muted);cursor:default;min-height:0}
+.cs-sum{margin-top:auto;background:var(--soft);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.cs-list{max-height:520px;overflow:auto}
