@@ -1,6 +1,10 @@
 /* Terjemahan ID. Kunci = teks English persis seperti di kode ({var} wajib dipertahankan). */
 "use strict";
 const I18N_ID = {
+  "PLS (Tigadari + Pidari combined)": "PLS (Tigadari + Pidari gabungan)", "External events": "Event eksternal",
+  "events & packages {p}": "event & paket {p}", "Include events & packages": "Sertakan event & paket", "excluding events & packages": "tanpa event & paket",
+  "excluded (no data for {m}): {l}": "dikecualikan (tanpa data {m}): {l}",
+  "category filter not applied (daily data has no category yet)": "filter kategori tidak berlaku (data harian belum punya kategori)",
   // ---- navigasi & shell ----
   "Overview": "Ikhtisar", "Executive Summary": "Ringkasan Eksekutif",
   "Revenue": "Pendapatan", "Daily & Projection": "Harian & Proyeksi", "By Outlet": "Per Outlet", "Events": "Acara (Event)", "Menu Sales": "Penjualan Menu",
@@ -175,9 +179,9 @@ const I18N_ID = {
   "Unmapped": "Belum terpetakan", "Weekends contribute {a} of sales from {b} of days.": "Akhir pekan menyumbang {a} penjualan dari {b} jumlah hari.",
   "X = units sold · Y = revenue · dashed lines = median · one dot per item": "X = unit terjual · Y = pendapatan · garis putus-putus = median · satu titik per item",
   "sold": "terjual", "{m} is month to date": "{m} adalah bulan berjalan (MTD)", "{m} projected to a full month from each unit’s latest report": "{m} diproyeksikan ke satu bulan penuh dari laporan terakhir tiap unit",
-  "{m} · all units complete through {c}, latest report {d} · by main group (item-level daily data is not available)": "{m} · seluruh unit lengkap s.d. {c}, laporan terakhir {d} · per grup utama (data harian per item tidak tersedia)",
+  "{m} · all units complete through {c}, latest report {d} · by main group": "{m} · seluruh unit lengkap s.d. {c}, laporan terakhir {d} · per grup utama",
   "{n} unit": "{n} unit", "{n} units": "{n} unit", "{n} unit is": "{n} unit", "{n} units are": "{n} unit",
-  "Item totals do not match the daily totals for {n} unit-months in this range — usually a Menu Engineering template still holding the previous month’s Total Sold.": "Total item tidak sama dengan total harian untuk {n} unit-bulan pada rentang ini — biasanya template Menu Engineering masih berisi Total Sold bulan sebelumnya.",
+  "Item totals do not match the daily totals for {n} unit-months in this range — usually a source sheet still holding another month’s data or a unit-month that was re-extracted only partly.": "Total item tidak sama dengan total harian untuk {n} unit-bulan pada rentang ini — biasanya sheet sumber masih berisi data bulan lain, atau unit-bulan itu baru diekstrak sebagian.",
   "Exclude these unit-months from all tables and figures": "Keluarkan unit-bulan tersebut dari seluruh tabel dan angka",
   "excluded (data issue): {l}": "dikecualikan (masalah data): {l}",
 };

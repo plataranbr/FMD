@@ -2,8 +2,11 @@
 "use strict";
 
 const MENU_CHUNK = 6;                                   // batas server menuItems per request
-const MENU_UNIT_LABEL = { PLS: "PLS (Spirit & Wine)" }; // unit menu "PLS" = outlet spirit & wine, beda dari TIGADARI/PIDARI
-const menuUnitLabel = u => MENU_UNIT_LABEL[u] || u;
+// Sumber = SALES ITEM: "PLS" hanya muncul di bulan dari file bulanan POS (Tigadari+Pidari belum terpisah); EVENT = sheet event eksternal
+const MENU_UNIT_LABEL = { PLS: () => t("PLS (Tigadari + Pidari combined)"), EVENT: () => t("External events") };
+const menuUnitLabel = u => MENU_UNIT_LABEL[u] ? MENU_UNIT_LABEL[u]() : u;
+const MENU_EVENT_CG = "Event & Package";
+const isEventItem = r => r.g === "EVENT" || r.cg === MENU_EVENT_CG;
 const mnum = v => Number(String(v ?? "").replace(/,/g, "")) || 0;
 
 const Menu = {
@@ -32,7 +35,7 @@ const Menu = {
     const res = await Promise.all(chunks.map(ch => api({ action: "menuItems", token: STATE.token, units: ch }).then(r => {
       done++; onProgress && onProgress(t("Loading menu items {a}/{b}…", { a: done, b: chunks.length })); return r; })));
     const bad = res.find(r => !r.ok); if (bad) throw new Error(bad.error || "menuItems");
-    const raw = { agg: agg.data, daily: daily.data, items: res.flatMap(r => r.data), units, stale: res.reduce((s, r) => s + ((r.meta && r.meta.skippedStaleMonthly) || 0), 0) };
+    const raw = { agg: agg.data, daily: daily.data, dcols: (daily.meta && daily.meta.cols) || null, items: res.flatMap(r => r.data), units, stale: res.reduce((s, r) => s + ((r.meta && r.meta.skippedStaleMonthly) || 0), 0) };
     this.ingest(raw); this.ver = ver;
     if (ver) IDB.set("menu|data", { ver, at: Date.now(), raw });   // satu kunci saja: versi lama tertimpa
   },
@@ -47,7 +50,11 @@ const Menu = {
   catInfo(g, c) { return this.map[String(g).toUpperCase() + "|" + String(c).toUpperCase()] || { cg: "", fb: "", ch: "", promo: false }; },
   ingest(raw) {
     this.agg = raw.agg.map(r => ({ m: String(r[0]).slice(0, 7), cl: String(r[1]), u: String(r[2]).trim(), g: String(r[3]).trim(), c: String(r[4]).trim(), sold: mnum(r[5]), rev: mnum(r[6]) }));
-    this.daily = raw.daily.map(r => ({ d: String(r[0]).slice(0, 10), cl: String(r[1]), u: String(r[2]).trim(), g: String(r[3]).trim(), sold: mnum(r[4]), rev: mnum(r[5]) }));
+    const dc = raw.dcols || ["Date", "Cluster", "Unit", "Main_Group", "Sold", "Total_Revenue"], di = k => dc.indexOf(k), iC = di("Category");
+    this.dailyHasCat = iC >= 0;
+    this.daily = raw.daily.map(r => { const g = String(r[di("Main_Group")]).trim(), c = iC >= 0 ? String(r[iC] ?? "").trim() : "";
+      return { d: String(r[di("Date")]).slice(0, 10), cl: String(r[di("Cluster")]), u: String(r[di("Unit")]).trim(), g, c, cg: c ? this.catInfo(g, c).cg : "",
+        sold: mnum(r[di("Sold")]), rev: mnum(r[di("Total_Revenue")]) }; });
     this.items = raw.items.map(r => { const g = String(r[2]).trim(), c = String(r[3]).trim(), ci = this.catInfo(g, c);
       return { m: String(r[0]).slice(0, 7), u: String(r[1]).trim(), g, c, art: String(r[4]), menu: String(r[5] ?? "").trim(), serv: String(r[6] ?? "").trim(),
         lt: String(r[7] ?? "").trim().toUpperCase(), price: mnum(r[8]), sold: mnum(r[9]), rev: mnum(r[10]), cg: ci.cg, fb: ci.fb || g, ch: ci.ch || "", promo: ci.promo }; });
