@@ -19,7 +19,7 @@ FMD.page("cost/summary", {
   async render(host, ctx) {
     host.innerHTML = UI.skeleton(90) + `<div class="grid g4">${UI.skeleton(100).repeat(4)}</div>` + UI.skeleton(420);
     let res;
-    try { res = await Cost.load(); } catch (e) { if (!ctx.isStale()) host.innerHTML = UI.card({ body: UI.banner(t("Cost data could not be loaded: {e}", { e: e.message }), "crit") }); return; }
+    try { res = await Cost.load("summary"); } catch (e) { if (!ctx.isStale()) host.innerHTML = UI.card({ body: UI.banner(t("Cost data could not be loaded: {e}", { e: e.message }), "crit") }); return; }
     if (ctx.isStale()) return;
     const missing = (res.missing || []).map(x => x.tab).filter(tb => tb === "DML_Cost_Daily" || tb === "Consumption_Master");
     let charts = [];

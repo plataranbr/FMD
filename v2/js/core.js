@@ -88,7 +88,9 @@ const Data = {
       const c = await IDB.get(ckey(t));
       if (c && c.ver && Date.now() - c.at < CFG.CACHE_MAX_AGE) { cached[t] = c; known[t] = c.ver; }
     }));
+    const t0 = performance.now();
     const r = await api({ action: "getDataBatch", token: STATE.token, tabs, known });
+    if (r && r.results) console.info("[FMD] getDataBatch " + Math.round(performance.now() - t0) + " ms · " + tabs.map(x => x + (r.results[x] && r.results[x].unchanged ? " (cache)" : r.results[x] && r.results[x].ok ? " (" + (r.results[x].n || 0) + ")" : " (x)")).join(", "));
     if (!r.ok) throw new Error(r.error || "getDataBatch failed");
     const missing = []; let changed = false;
     tabs.forEach(t => {

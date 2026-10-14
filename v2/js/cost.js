@@ -2,6 +2,12 @@
 "use strict";
 
 const COST_TABS = ["DML_Cost_Daily", "Consumption_Master", "DML_Gas_Daily", "CK_FG_Transfer", "CK_FG_Production"];
+// set tab per halaman: muat seperlunya (Consumption_Master ~58k baris berat; Summary cukup agregat harian Consumption_Agg)
+const COST_SETS = {
+  summary: ["DML_Cost_Daily", "Consumption_Agg", "DML_Gas_Daily", "CK_FG_Transfer"],
+  dml: ["DML_Cost_Daily", "DML_Gas_Daily", "DML_Cadence"],
+  full: COST_TABS,
+};
 const COST_BASE_TABS = ["Revenue_Master", "Forecast_Output", "DIM_UNIT", "DIM_TANGGAL"];
 const STORE_UNITS = ["PLD", "PLS", "PLMT", "CK", "TSMB"];          // unit ber-store (sumber SR/transfer)
 const FG_CK_PREFIX = ["1117", "1118", "1119", "1120", "1121"];       // = FG_Master template CK
@@ -10,18 +16,28 @@ const LEAD_TIME_MIN = 4;                                             // hari; pe
 
 const Cost = {
   _done: new WeakSet(), _ck: null,
-  async load() {
-    const r = await Data.load(COST_TABS.concat(COST_BASE_TABS));
+  async load(set = "summary") {
+    const t0 = performance.now();
+    const r = await Data.load(COST_SETS[set].concat(COST_BASE_TABS));
+    // server lama belum punya tab Consumption_Agg -> pakai Consumption_Master (lebih lambat, hasil sama)
+    if (set === "summary" && r.missing.some(x => x.tab === "Consumption_Agg")) {
+      const r2 = await Data.load(["Consumption_Master"]); r.missing = r.missing.filter(x => x.tab !== "Consumption_Agg").concat(r2.missing);
+    }
     this.prep();
+    console.info(`[FMD] cost load (${set}) ${Math.round(performance.now() - t0)} ms`);
     return r;
   },
+  /** sumber konsumsi: agregat harian bila ada, else baris detail */
+  consSrc() { const a = STATE.data.Consumption_Agg; return a && a.length ? a : (STATE.data.Consumption_Master || []); },
   /** normalisasi kode unit + tanggal; per objek array (Data.load bisa mengganti array kapan saja) */
   prep() {
     const once = (tab, fn) => { const a = STATE.data[tab]; if (!a || this._done.has(a)) return false; a.forEach(fn); this._done.add(a); return true; };
     let ch = false;
     ch = once("DML_Cost_Daily", r => { r.Unit = Dim.norm(r.Unit); r._d = dstr(r.Tanggal); }) || ch;
     ch = once("DML_Gas_Daily", r => { r.Unit = Dim.norm(r.Unit); r._d = dstr(r.Tanggal); }) || ch;
-    ch = once("Consumption_Master", r => { r.Unit_Beban = Dim.norm(r.Unit_Beban) || Dim.fromStorage(r.Storage_Raw); r.Unit_Sumber = Dim.norm(r.Unit_Sumber); r._d = dstr(r.Tanggal); }) || ch;
+    const consFix = r => { r.Unit_Beban = Dim.norm(r.Unit_Beban) || Dim.fromStorage(r.Storage_Raw); r.Unit_Sumber = Dim.norm(r.Unit_Sumber); r._d = dstr(r.Tanggal); };
+    ch = once("Consumption_Master", consFix) || ch;
+    ch = once("Consumption_Agg", consFix) || ch;
     if (this._ck !== STATE.data.CK_FG_Transfer) {
       this._ck = STATE.data.CK_FG_Transfer;
       STATE.data.CK_FG_Rows = (this._ck || []).map(r => ({ Tanggal: r.Date, _d: dstr(r.Date), Unit_Beban: Dim.norm(r.Unit), Unit_Sumber: "CK",
@@ -37,7 +53,7 @@ const Cost = {
   allKeys() {
     return memo("cost|keys", () => [...new Set([
       ...(STATE.data.DML_Cost_Daily || []).map(r => r.Unit),
-      ...(STATE.data.Consumption_Master || []).map(r => r.Unit_Beban)].filter(Boolean).map(u => this.key(u)))]);
+      ...this.consSrc().map(r => r.Unit_Beban)].filter(Boolean).map(u => this.key(u)))]);
   },
   /** tampil? = dimonitor DIM_UNIT & punya Cost_Data_Since (CK selalu). Mengembalikan alasan bila tidak. */
   hidden(k) { if (COST_CENTER_ONLY.has(k)) return ""; const m = this.members(k); return m.some(u => Dim.costSince(u)) ? "" : (m.some(u => Dim.monitored(u)) ? "nodata" : "unmonitored"); },
@@ -96,9 +112,9 @@ const Cost = {
     const fromStore = STORE_UNITS.includes(String(r.Unit_Sumber || "").trim());
     return STORE_UNITS.includes(u) || (String(r.Tipe || "").toUpperCase() === "TRANSFER" && fromStore);   // unit tanpa store: hanya transfer masuk
   },
-  isFgCK(r) { if (String(r.Unit_Sumber || "").trim() !== "CK") return false; const a = String(r.ArtNo || ""); return a.length === 7 && FG_CK_PREFIX.some(p => a.startsWith(p)); },
+  isFgCK(r) { if (r.FG !== undefined) return String(r.FG).toUpperCase() === "Y"; if (String(r.Unit_Sumber || "").trim() !== "CK") return false; const a = String(r.ArtNo || ""); return a.length === 7 && FG_CK_PREFIX.some(p => a.startsWith(p)); },
   consRows(o) { return memo("cost|consrows|" + this.sig(o), () => {
-    let rows = (STATE.data.Consumption_Master || []).filter(r => this.consFilter(r, o) && (!o.fgManual || !this.isFgCK(r)));
+    let rows = this.consSrc().filter(r => this.consFilter(r, o) && (!o.fgManual || !this.isFgCK(r)));
     if (o.fgManual) rows = rows.concat((STATE.data.CK_FG_Rows || []).filter(r => this.consFilter(r, o)));
     return rows; }); },
   cons(o) { return memo("cost|cons|" + this.sig(o), () => {
@@ -148,7 +164,7 @@ const Cost = {
   lastDates() { return memo("cost|last", () => {
     const o = {};
     (STATE.data.DML_Cost_Daily || []).forEach(r => { const k = this.key(r.Unit), x = (o[k] = o[k] || { dml: "", srt: "" }); if (r._d > x.dml) x.dml = r._d; });
-    (STATE.data.Consumption_Master || []).forEach(r => { if (!r.Unit_Beban) return; const k = this.key(r.Unit_Beban), x = (o[k] = o[k] || { dml: "", srt: "" }); if (r._d > x.srt) x.srt = r._d; });
+    this.consSrc().forEach(r => { if (!r.Unit_Beban) return; const k = this.key(r.Unit_Beban), x = (o[k] = o[k] || { dml: "", srt: "" }); if (r._d > x.srt) x.srt = r._d; });
     return o; }); },
 };
 

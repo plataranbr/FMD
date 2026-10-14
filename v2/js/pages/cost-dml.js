@@ -16,7 +16,7 @@ function monthsIn(from, to) { const out = []; for (let m = from.slice(0, 7); m <
 FMD.page("cost/dml", {
   async render(host, ctx) {
     host.innerHTML = UI.skeleton(90) + `<div class="grid g4">${UI.skeleton(100).repeat(4)}</div>` + UI.skeleton(420);
-    try { await Cost.load(); await Data.load(["DML_Cadence"]); } catch (e) { if (!ctx.isStale()) host.innerHTML = UI.card({ body: UI.banner(t("Cost data could not be loaded: {e}", { e: e.message }), "crit") }); return; }
+    try { await Cost.load("dml"); } catch (e) { if (!ctx.isStale()) host.innerHTML = UI.card({ body: UI.banner(t("Cost data could not be loaded: {e}", { e: e.message }), "crit") }); return; }
     if (ctx.isStale()) return;
     let loadErr = "", loading = false;
 
