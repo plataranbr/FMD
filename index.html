@@ -282,7 +282,6 @@
   .unitpanel .uctrl{display:flex;gap:6px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--line)}
   .unitpanel .uctrl button{flex:1;font-size:11px;padding:3px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;font-weight:600;color:var(--ink)}
 </style>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -290,16 +289,10 @@
 <div id="login">
   <div class="login-card">
     <h1>Finance Monitoring Dashboard</h1>
-    <div id="gsiBox">
-      <p>Sign in with your registered Google account.</p>
-      <div id="gsiBtn" style="display:flex;justify-content:center;min-height:44px;margin:8px 0 4px"></div>
-    </div>
-    <div id="pinBox" class="hidden">
-      <p>Signed in as <b id="gEmail"></b> · <a href="#" id="gSwitch">use another account</a></p>
-      <label for="pin">PIN</label>
-      <input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off">
-      <button id="loginBtn">Sign In</button>
-    </div>
+    <p>Enter your PIN to sign in.</p>
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off">
+    <button id="loginBtn">Sign In</button>
     <div class="login-err" id="loginErr"></div>
   </div>
 </div>
@@ -778,9 +771,7 @@
 /* =========================================================
    KONFIG — GANTI URL INI dengan Web App URL kamu (/exec)
    ========================================================= */
-const API_URL = "https://script.google.com/macros/s/AKfycbyit7vuZRUUcSljj6nq-74WrKnWipU6DKNYw2uoqfZyQcYnVYVdUmL5iXYm5tE39teUzA/exec";
-/* OAuth Client ID (Google Cloud Console). Bukan rahasia: aman di repo publik. */
-const GOOGLE_CLIENT_ID = "551623373117-uumtu4ortk0r2vtjhe19trbun7tvvfe3.apps.googleusercontent.com";
+const API_URL = "https://script.google.com/macros/s/AKfycbyit7vuZRUUcSljj6nq-74WrKnWipU6DKNYw2uoqfZyQcYnVYVdUmL5iXYm5tE39teUzA/exec?action=status&key=plataran2026";
 
 /* Ambang warna Achievement (proj/budget). Ubah di sini kalau mau geser. */
 /* Rule Achievement (proj/budget), urut diperiksa dari atas: */
@@ -883,45 +874,21 @@ const $=id=>document.getElementById(id);
 $("loginBtn").onclick = doLogin;
 $("pin").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
 
-/* ===== Google Identity Services: ID token -> diverifikasi server, lalu PIN ===== */
-let GID=null; // {token,email}
-function b64urlJson(s){ s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="=";
-  return JSON.parse(decodeURIComponent(escape(atob(s)))); }
-function initGoogle(){
-  if(!(window.google&&google.accounts&&google.accounts.id)){ setTimeout(initGoogle,200); return; }
-  if(GOOGLE_CLIENT_ID.indexOf("GANTI")===0){ $("loginErr").textContent="GOOGLE_CLIENT_ID is not set in the code."; return; }
-  google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:onGoogle, auto_select:false, ux_mode:"popup"});
-  google.accounts.id.renderButton($("gsiBtn"),{theme:"outline",size:"large",text:"signin_with",shape:"pill",width:280});
-}
-function onGoogle(resp){
-  try{ const p=b64urlJson(resp.credential.split(".")[1]); GID={token:resp.credential,email:p.email||""}; }
-  catch(e){ $("loginErr").textContent="Google sign-in failed. Please try again."; return; }
-  $("loginErr").textContent=""; $("gEmail").textContent=GID.email;
-  $("gsiBox").classList.add("hidden"); $("pinBox").classList.remove("hidden"); $("pin").focus();
-}
-function resetGoogle(){ GID=null; $("pin").value="";
-  $("pinBox").classList.add("hidden"); $("gsiBox").classList.remove("hidden");
-  try{ google.accounts.id.disableAutoSelect(); }catch(e){} }
-$("gSwitch").onclick=e=>{ e.preventDefault(); resetGoogle(); };
-initGoogle();
-
 async function doLogin(){
   const pin=$("pin").value.trim();
   $("loginErr").textContent="";
-  if(!GID){ $("loginErr").textContent="Please sign in with Google first."; return; }
-  if(!pin){ $("loginErr").textContent="Please enter your PIN."; return; }
-  $("loginBtn").disabled=true; $("loginBtn").textContent="Checking…";
+  if(!pin){ $("loginErr").textContent="PIN belum diisi."; return; }
+  if(API_URL.indexOf("GANTI")===0){ $("loginErr").textContent="API_URL belum diisi di kode."; return; }
+  $("loginBtn").disabled=true; $("loginBtn").textContent="Memeriksa…";
   try{
-    const r=await api({action:"login",pin,idToken:GID.token});
-    if(!r.ok){ $("loginErr").textContent=r.error||"Sign-in failed.";
-      if(/expired|invalid|Google/i.test(r.error||"")&&!/registered/i.test(r.error||"")) resetGoogle();
-      return; }
+    const r=await api({action:"login",pin});
+    if(!r.ok){ $("loginErr").textContent=r.error||"PIN salah."; return; }
     STATE.token=r.token; STATE.role=r.role; STATE.allowed=r.allowed; STATE.name=r.nama;
     $("login").classList.add("hidden"); $("app").classList.remove("hidden");
     $("whoName2").textContent=r.nama; $("whoRole2").textContent=r.role;
     await boot();
-  }catch(e){ $("loginErr").textContent="Connection failed: "+e.message; }
-  finally{ $("loginBtn").disabled=false; $("loginBtn").textContent="Sign In"; }
+  }catch(e){ $("loginErr").textContent="Gagal terhubung: "+e.message; }
+  finally{ $("loginBtn").disabled=false; $("loginBtn").textContent="Masuk"; }
 }
 
 /* ===== ambil 1 tab, return objects (atau null kalau tak boleh/akses) ===== */
@@ -3108,7 +3075,7 @@ function closeSidebar(){ $("sidebar").classList.remove("open"); $("backdrop").cl
 $("hamb").onclick=openSidebar; $("backdrop").onclick=closeSidebar;
 
 /* logout & refresh di sidebar */
-$("logoutBtn2").onclick=async()=>{ try{ await api({action:"logout",token:STATE.token}); }catch(e){} try{ google.accounts.id.disableAutoSelect(); }catch(e){} await IDB.clear(); location.reload(); };
+$("logoutBtn2").onclick=async()=>{ try{ await api({action:"logout",token:STATE.token}); }catch(e){} await IDB.clear(); location.reload(); };
 $("refreshBtn").onclick=reloadData;
 async function reloadData(){
   const btn=$("refreshBtn"); const old=btn.textContent; btn.disabled=true; btn.textContent="Memuat\u2026";
