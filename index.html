@@ -793,11 +793,13 @@ const STATE = { token:null, role:null, allowed:null, name:null,
 
 /* ===== Helper: panggil API (text/plain hindari CORS preflight) ===== */
 async function api(payload){
+  const t0=performance.now();
   const res = await fetch(API_URL, {
     method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:JSON.stringify(payload), redirect:"follow"
   });
   const txt = await res.text();
+  console.log("[api]",payload.action,Math.round(performance.now()-t0)+"ms",Math.round(txt.length/1024)+"KB");
   return JSON.parse(txt);
 }
 
@@ -903,6 +905,39 @@ async function getTabsBatch(tabs){
   return r.results; // {tabName: {ok,headers,rows,...} atau {ok:false,error}}
 }
 
+/* ===== CACHE BROWSER (IndexedDB) + cek versi server ===== */
+const CACHE_MAX_AGE=12*3600*1000; // jaring pengaman: data cache > 12 jam selalu ditarik ulang
+const IDB=(()=>{ let dbp=null;
+  function db(){ return dbp||(dbp=new Promise((res,rej)=>{ try{ const q=indexedDB.open("fmd-cache",1);
+    q.onupgradeneeded=()=>q.result.createObjectStore("kv"); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error);
+  }catch(e){ rej(e); } })); }
+  function tx(mode,fn){ return db().then(d=>new Promise((res,rej)=>{ const t=d.transaction("kv",mode); const r=fn(t.objectStore("kv"));
+    t.oncomplete=()=>res(r&&r.result); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error); })); }
+  return { get:k=>tx("readonly",s=>s.get(k)).catch(()=>undefined),
+           set:(k,v)=>tx("readwrite",s=>s.put(v,k)).catch(()=>{}),
+           clear:()=>tx("readwrite",s=>s.clear()).catch(()=>{}) };
+})();
+function ckey(t){ return "tab|"+(STATE.name||"")+"|"+t; }
+/* Pengganti getTabsBatch: kirim versi yg sudah dipegang; server balas "unchanged" tanpa isi bila sama. */
+async function getTabsCached(tabs){
+  const cached={}, known={};
+  await Promise.all(tabs.map(async t=>{ const c=await IDB.get(ckey(t));
+    if(c&&c.ver&&(Date.now()-c.at)<CACHE_MAX_AGE){ cached[t]=c; known[t]=c.ver; } }));
+  const r=await api({action:"getDataBatch",token:STATE.token,tabs,known});
+  if(!r.ok) throw new Error(r.error||"getDataBatch gagal");
+  const out={};
+  tabs.forEach(t=>{ const x=r.results[t];
+    if(x&&x.ok&&x.unchanged&&cached[t]){ out[t]={ok:true,headers:cached[t].headers,rows:cached[t].rows,fromCache:true}; return; }
+    out[t]=x;
+    if(x&&x.ok&&!x.unchanged&&x.ver) IDB.set(ckey(t),{ver:x.ver,at:Date.now(),headers:x.headers,rows:x.rows});
+  });
+  return out;
+}
+/* Memo hasil hitung berat; kunci = kombinasi filter. Dikosongkan tiap data baru masuk. */
+const MEMO={};
+function memo(k,fn){ if(k in MEMO) return MEMO[k]; if(Object.keys(MEMO).length>300) memoClear(); return (MEMO[k]=fn()); }
+function memoClear(){ for(const k in MEMO) delete MEMO[k]; }
+
 /* =========================================================
    BOOT — tarik data, hitung, render
    ========================================================= */
@@ -911,7 +946,7 @@ async function boot(){
   const need=["Revenue_Master","Budget_Master","Forecast_Output","Event_Pipeline","DIM_UNIT","DIM_TANGGAL"];
   const missing=[];
   let results;
-  try{ results = await getTabsBatch(need); }
+  try{ results = await getTabsCached(need); }
   catch(e){ showErr("Gagal mengambil data: "+e.message); return; }
   need.forEach(t=>{
     const r=results[t];
@@ -1585,8 +1620,18 @@ function resizeRevenueCharts(){ // Chart.js bisa gepeng kalau sempat ter-hidden 
 const LEAD_TIME_MIN=4; // rentang < ini -> warning bias lead-time belanja
 const STORE_UNITS=["PLD","PLS","PLMT","CK","TSMB"];
 // kode unit sumber cost != kode Revenue_Master (tanpa prefix T) -> normalkan ke kode revenue
-const UNIT_ALIAS={BXC:"TBXC",SMS:"TSMS",SMB:"TSMB",PIM:"TPIM"};
-function normUnit(u){ u=String(u||"").trim(); return UNIT_ALIAS[u]||u; }
+const UNIT_ALIAS_FALLBACK={BXC:"TBXC",SMS:"TSMS",SMB:"TSMB",PIM:"TPIM"};
+let DIMX=null; // cache turunan DIM_UNIT; di-reset tiap DIM_UNIT dimuat ulang
+function dimx(){ if(DIMX) return DIMX;
+  const dim=STATE.data.DIM_UNIT||[], alias={...UNIT_ALIAS_FALLBACK}, meta={}, kw=[];
+  const hasNew=dim.length>0 && ("Cost_Data_Since" in dim[0]);
+  dim.forEach(d=>{ const u=String(d.Unit||"").trim(); if(!u) return;
+    String(d.Alias||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(a=>alias[a]=u);
+    const k=String(d.Storage_Keyword||"").trim().toUpperCase(); if(k) kw.push([k,u]);
+    meta[u]={group:String(d.Cost_Group||"").trim()||u, since:d.Cost_Data_Since?ym(d.Cost_Data_Since):""}; });
+  const x={alias,meta,kw,hasNew}; if(dim.length) DIMX=x; return x; } // jangan cache sebelum DIM_UNIT termuat
+function normUnit(u){ u=String(u||"").trim(); return dimx().alias[u]||u; }
+function unitFromStorage(s){ s=String(s||"").toUpperCase(); const h=dimx().kw.find(([k])=>s.includes(k)); return h?h[1]:""; }
 function gasOn(){ const e=$("cogsInclGas"); return !!(e&&e.checked); }
 function gasMap(){ const m={}; (STATE.data.DML_Gas_Daily||[]).forEach(r=>{ const u=normUnit(r.Unit); const t=dstr(r.Tanggal);
     ((m[u]=m[u]||{})[t]=(m[u][t]||0)+(Number(r.Amount)||0)); }); return m; }
@@ -1595,7 +1640,10 @@ function fgManualOn(){ const e=$("cogsFgSrc"); return !e||e.value!=="CONS"; }
 const FG_CK_PREFIX=["1117","1118","1119","1120","1121"]; // = isi FG_Master spreadsheet CK
 function isFgCK(r){ if(String(r.Unit_Sumber||"").trim()!=="CK")return false;
   const a=String(r.ArtNo||""); return a.length===7&&FG_CK_PREFIX.some(p=>a.startsWith(p)); }
-const HIDE_UNITS=new Set(["PW","PGS"]); // data belum ada -> sembunyikan dulu
+const HIDE_UNITS_FALLBACK=new Set(["PW","PGS"]);
+// sembunyikan unit yg tidak ada di DIM_UNIT (tidak dimonitor) atau belum punya data cost; CK tetap tampil
+const HIDE_UNITS={ has(u){ const x=dimx(); if(!x.hasNew) return HIDE_UNITS_FALLBACK.has(u);
+  if(u==="CK") return false; const m=x.meta[u]; return !m || !m.since; } };
 function unitOrderIdx(u){ const dim=STATE.data.DIM_UNIT||[]; for(let k=0;k<dim.length;k++) if(String(dim[k].Unit).trim()===u) return k; return 999; }
 function unitNames(u){ const dim=STATE.data.DIM_UNIT||[];
   return [...new Set(dim.filter(d=>String(d.Unit).trim()===u).map(d=>d.Nama_Display).filter(Boolean))].join(" / "); }
@@ -1615,7 +1663,9 @@ function consFilter_(r,from,to,sel){ // predikat bersama Consumption_Master & ba
   // unit ber-store: semua baris beban-nya. unit lain: hanya TRANSFER masuk dari store.
   return STORE_UNITS.includes(u) || (tipe==="TRANSFER"&&fromStore);
 }
-function consRows(){ // baris konsumsi relevan pd filter periode+unit; FOOD/BEV saja
+function cogsKey(){ const {from,to}=cogsRange(); return from+"|"+to+"|"+cogsSelectedUnits().join(",")+"|"+gasOn()+"|"+fgManualOn(); }
+function consRows(){ return memo("cons|"+cogsKey(),consRows_); }
+function consRows_(){ // baris konsumsi relevan pd filter periode+unit; FOOD/BEV saja
   const {from,to}=cogsRange(); const sel=new Set(cogsSelectedUnits());
   const man=fgManualOn();
   let rows=(STATE.data.Consumption_Master||[]).filter(r=>consFilter_(r,from,to,sel)&&(!man||!isFgCK(r)));
@@ -1634,7 +1684,8 @@ function consAgg(){ // agregat per unit + per hari + flag INCOMPLETE
   });
   return {per,day,inc};
 }
-function sumData(){ // GABUNGAN: COGS = DML (belanja langsung) + konsumsi SR/Transfer (store) — dua aliran terpisah, tidak dobel
+function sumData(){ return memo("sum|"+cogsKey(),sumData_); }
+function sumData_(){ // GABUNGAN: COGS = DML (belanja langsung) + konsumsi SR/Transfer (store) — dua aliran terpisah, tidak dobel
   const {from,to}=cogsRange(); const dml=cogsData(); const c=consAgg(); const U={};
   new Set([...Object.keys(dml.U),...Object.keys(c.per)]).forEach(u=>{
     if(HIDE_UNITS.has(u))return;
@@ -1665,7 +1716,8 @@ function lastFullMonth(){ const la=STATE.lastActualDate||""; if(!la)return null;
 
 // revenue per unit: per hari actual bila ada, else forecast (snapshot terbaru). Jumlah atas [from,to].
 const REV_MERGE={PLCS:["PLCS","PKJ"]}; // rev PKJ digabung ke PLCS: belanja & SR event PKJ lewat PLCS (cabut bila PKJ punya cost data sendiri)
-function revDaysForUnit(unit,from,to){
+function revDaysForUnit(unit,from,to){ return memo("rev|"+unit+"|"+from+"|"+to,()=>revDaysForUnit_(unit,from,to)); }
+function revDaysForUnit_(unit,from,to){
   const uset=new Set(REV_MERGE[unit]||[unit]);
   const rev=STATE.data.Revenue_Master||[], fc=STATE.data.Forecast_Output||[];
   const act={}; let lastAct="";
@@ -1703,7 +1755,8 @@ function targetFor(unit,cat,rv,src){ // cat: "F"|"B"|kosong(blended weighted). s
 // Band: di atas target selalu MERAH; mendekati target oranye/kuning (relatif thd target).
 function costBand(p,target){ if(p==null)return"cp-none"; const r=p/target; if(r>1)return"cp-red"; if(r>0.95)return"cp-orange"; if(r>0.90)return"cp-yellow"; return"cp-green"; }
 
-function cogsData(){
+function cogsData(){ return memo("dml|"+cogsKey(),cogsData_); }
+function cogsData_(){
   const cd=STATE.data.DML_Cost_Daily||[]; const {from,to}=cogsRange(); const sel=new Set(cogsSelectedUnits());
   const U={}; let relAmt={RELIABLE:0,INDICATIVE:0,INCOMPLETE:0};
   cd.forEach(r=>{ const u=String(r.Unit||"").trim(); if(!u||!sel.has(u))return; const t=dstr(r.Tanggal); if(t<from||t>to)return;
@@ -1721,7 +1774,10 @@ function cogsData(){
     u.relDot=u.inc>0?"INCOMPLETE":(u.ind>0?"INDICATIVE":"RELIABLE"); });
   return {U,relAmt,from,to};
 }
-function renderCogs(){ renderCogsWarn(); renderCogsBanner(); renderCogsTotal(); renderCogsChart(); renderDayChart(); renderCogsTable(); renderDmlRatio(); renderSrt(); renderCkTab(); }
+function activeCtab(){ const b=document.querySelector("#ctabs .chip.active"); return (b&&b.dataset.ct)||"summary"; }
+function renderCogs(){ renderCogsTotal(); const t=activeCtab(); // hanya tab yg terlihat
+  if(t==="summary"){ renderCogsWarn(); renderCogsBanner(); renderCogsChart(); renderDayChart(); renderCogsTable(); }
+  else if(t==="dml") renderDmlRatio(); else if(t==="srt") renderSrt(); else if(t==="ck") renderCkTab(); }
 function renderDmlRatio(){
   const tb=$("dmlRatioBody"); if(!tb)return;
   const {from,to}=cogsRange(); const U=cogsData().U;
@@ -1831,7 +1887,7 @@ function monthsBetween(from,to){ const out=[]; let d=new Date(from.slice(0,7)+"-
 function monthEnd(m){ const d=new Date(m+"-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth()+1); d.setUTCDate(0); return d.toISOString().slice(0,10); }
 async function ensureCadence(){
   if(STATE.data.DML_Cadence) return;
-  try{ const res=await getTabsBatch(["DML_Cadence"]);
+  try{ const res=await getTabsCached(["DML_Cadence"]);
     STATE.data.DML_Cadence=(res.DML_Cadence&&res.DML_Cadence.ok)?rowsToObjs(res.DML_Cadence.headers,res.DML_Cadence.rows):[];
   }catch(e){ STATE.data.DML_Cadence=[]; }
 }
@@ -2130,21 +2186,30 @@ function fillDmlKategori(){ const sel=$("dmlKategori"); if(!sel)return; const cu
   if(cur&&[...sel.options].some(o=>o.value===cur)) sel.value=cur; }
 function cadKey(u,mid,item){ return String(u).trim()+"|"+((mid!==""&&mid!=null)?mid:item); }
 function cadenceMap(){ const m={}; (STATE.data.DML_Cadence||[]).forEach(r=>{ m[cadKey(r.Unit,r.Mapping_ID,r.Nama_Item)]=r; }); return m; }
+/* Detail DML: SATU panggilan utk seluruh rentang (server scan DML_Master sekali), cache per bulan + versi. */
+async function ensureDMLMonths(months){
+  if(!STATE.dmlByMonth){ const c=await IDB.get("dml|"+(STATE.name||""));
+    if(c&&(Date.now()-c.at)<CACHE_MAX_AGE){ STATE.dmlByMonth=c.byMonth; STATE.dmlVer=c.ver; STATE.dmlAt=c.at; }
+    else STATE.dmlByMonth={}; }
+  const have=months.every(m=>STATE.dmlByMonth[m]);
+  const r=await api({action:"getDMLDetail",token:STATE.token,from:months[0]+"-01",to:monthEnd(months[months.length-1]),
+    units:cogsUnitsAll(),known:(have&&STATE.dmlVer)||null});
+  if(!r.ok) return months;                       // gagal: kembalikan daftar bulan gagal, cache lama tak disentuh
+  if(r.unchanged) return [];
+  if(r.ver!==STATE.dmlVer){ STATE.dmlByMonth={}; STATE.dmlAt=Date.now(); } // versi baru: buang semua bulan lama
+  months.forEach(m=>STATE.dmlByMonth[m]=[]);
+  rowsToObjs(r.headers,r.rows).forEach(o=>{ const m=dstr(o.Tanggal).slice(0,7); (STATE.dmlByMonth[m]=STATE.dmlByMonth[m]||[]).push(o); });
+  STATE.dmlVer=r.ver||null;
+  if(r.ver) IDB.set("dml|"+(STATE.name||""),{ver:r.ver,at:STATE.dmlAt||Date.now(),byMonth:STATE.dmlByMonth});
+  return [];
+}
 async function loadDMLDetail(){
   const {from,to}=cogsRange();
-  STATE.dmlByMonth=STATE.dmlByMonth||{};
   $("dmlLoading").classList.remove("hidden"); $("dmlHint").classList.add("hidden");
   $("dmlTable").classList.add("hidden"); $("dmlControls").classList.add("hidden");
   try{
-    const curM=(STATE.lastActualDate||"").slice(0,7);
-    const months=monthsBetween(from,to); const failed=[];
-    for(const m of months){
-      if(STATE.dmlByMonth[m] && m!==curM) continue;           // cache bulan lampau; bulan berjalan selalu segar
-      const r=await api({action:"getDMLDetail",token:STATE.token,from:m+"-01",to:monthEnd(m),units:cogsUnitsAll()});
-      if(!r.ok){ failed.push(m); delete STATE.dmlByMonth[m]; continue; }   // JANGAN cache bulan gagal
-      STATE.dmlByMonth[m]=rowsToObjs(r.headers,r.rows);
-    }
-    STATE.dmlFailed=failed;
+    const months=monthsBetween(from,to);
+    STATE.dmlFailed=await ensureDMLMonths(months);
     STATE.dml=months.flatMap(m=>STATE.dmlByMonth[m]||[]).filter(r=>{ const t=dstr(r.Tanggal); return t>=from&&t<=to; });
     STATE.dmlLoaded={from,to}; STATE.dmlPage=1;
     await ensureCadence();
@@ -2411,16 +2476,20 @@ function renderSrtDetail(){
   $("sdPageInfo").textContent=`Hal ${STATE.sdPage+1}/${nPage} \u00b7 ${fmt(rows.length)} baris`;
   $("sdPrev").disabled=STATE.sdPage<=0; $("sdNext").disabled=STATE.sdPage>=nPage-1;
 }
+async function loadCostTabs(){
+  const need=["DML_Cost_Daily","Consumption_Master","DML_Gas_Daily","CK_FG_Transfer","CK_FG_Production"];
+  const res=await getTabsCached(need);
+  need.forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
+  (STATE.data.DML_Cost_Daily||[]).forEach(r=>r.Unit=normUnit(r.Unit));
+  (STATE.data.Consumption_Master||[]).forEach(r=>{ r.Unit_Beban=normUnit(r.Unit_Beban)||unitFromStorage(r.Storage_Raw); r.Unit_Sumber=normUnit(r.Unit_Sumber); });
+  // baris manual FG CK -> bentuk kolom sama dgn Consumption_Master (downstream tak berubah)
+  STATE.data.CK_FG_Rows=(STATE.data.CK_FG_Transfer||[]).map(r=>({Tanggal:r.Date,Unit_Beban:normUnit(r.Unit),Unit_Sumber:"CK",Tipe:"TRANSFER",ArtNo:String(r.Art_No||""),Description:r.Description,Kategori:"FOOD",Qty:Number(r.Qty)||0,Amount:Number(r.Amount)||0,Flag_Status:"",Src:"MANUAL"}));
+  memoClear();
+}
 async function ensureCostData(){
   if(!GRP_LOADED.cost){
     $("cogsLoading").classList.remove("hidden");
-try{ const need=["DML_Cost_Daily","Consumption_Master","DML_Gas_Daily","CK_FG_Transfer","CK_FG_Production"];
-      const res=await getTabsBatch(need);
-      need.forEach(t=>{ const r=res[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
-      (STATE.data.DML_Cost_Daily||[]).forEach(r=>r.Unit=normUnit(r.Unit));
-      (STATE.data.Consumption_Master||[]).forEach(r=>{ r.Unit_Beban=normUnit(r.Unit_Beban); r.Unit_Sumber=normUnit(r.Unit_Sumber); });
-      // baris manual FG CK -> bentuk kolom sama dgn Consumption_Master (downstream tak berubah)
-      STATE.data.CK_FG_Rows=(STATE.data.CK_FG_Transfer||[]).map(r=>({Tanggal:r.Date,Unit_Beban:normUnit(r.Unit),Unit_Sumber:"CK",Tipe:"TRANSFER",ArtNo:String(r.Art_No||""),Description:r.Description,Kategori:"FOOD",Qty:Number(r.Qty)||0,Amount:Number(r.Amount)||0,Flag_Status:"",Src:"MANUAL"}));
+try{ await loadCostTabs();
       GRP_LOADED.cost=true; initCogsFilters(); ensureFreshness();
     }catch(e){ $("cogsBanner").innerHTML='<div class="cogs-banner warn">Gagal memuat COGS: '+e.message+'</div>'; return; }
     finally{ $("cogsLoading").classList.add("hidden"); } }
@@ -2430,9 +2499,7 @@ document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>showGroup(b.data
 document.querySelectorAll("#ctabs .chip").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#ctabs .chip").forEach(x=>x.classList.toggle("active",x===b));
   ["summary","dml","srt","ck"].forEach(t=>$("ctab-"+t).style.display=(b.dataset.ct===t?"":"none"));
-  renderCogsTotal();
-  if(b.dataset.ct==="srt")renderSrt();
-  if(b.dataset.ct==="ck")renderCkTab();
+  renderCogs();
 });
 
 
@@ -2546,17 +2613,10 @@ async function openCktDml(){ const {from,to}=cogsRange();
   openOverlay("DML CK \u2014 direct purchase",from+" s/d "+to);
   $("puBody").innerHTML='<div class="cogs-loading"><span class="spin"></span> Memuat detail DML CK\u2026</div>';
   // DML_Cost_Daily hanya agregat harian; detail item via getDMLDetail (lazy, cache per bulan, unit CK saja)
-  STATE.cktDmlM=STATE.cktDmlM||{};
-  const curM=(STATE.lastActualDate||"").slice(0,7); const failed=[];
-  for(const m of monthsBetween(from,to)){
-    if(STATE.cktDmlM[m]&&m!==curM) continue;
-    try{ const r=await api({action:"getDMLDetail",token:STATE.token,from:m+"-01",to:monthEnd(m),units:["CK"]});
-      if(r.ok) STATE.cktDmlM[m]=rowsToObjs(r.headers,r.rows).filter(x=>String(x.Unit).trim()==="CK");
-      else { failed.push(m); delete STATE.cktDmlM[m]; }
-    }catch(e){ failed.push(m); delete STATE.cktDmlM[m]; }
-  }
-  const rows=monthsBetween(from,to).flatMap(m=>STATE.cktDmlM[m]||[])
-    .filter(r=>{ const t=dstr(r.Tanggal); return t>=from&&t<=to; });
+  const ms=monthsBetween(from,to); let failed=[];
+  try{ failed=await ensureDMLMonths(ms); }catch(e){ failed=ms; }
+  const rows=ms.flatMap(m=>STATE.dmlByMonth[m]||[])
+    .filter(r=>{ const t=dstr(r.Tanggal); return String(r.Unit).trim()==="CK"&&t>=from&&t<=to; });
   cktPuOpen("DML CK \u2014 direct purchase"+(failed.length?" (bulan gagal dimuat: "+failed.join(", ")+")":""),from+" s/d "+to,rows,[
     {k:"tgl",label:"Date",val:r=>dstr(r.Tanggal),fmt:r=>dstr(r.Tanggal)},
     {k:"item",label:"Item",val:r=>String(r.Nama_Item||""),fmt:r=>r.Nama_Item||""},
@@ -2625,9 +2685,10 @@ async function msFetchItems(fetchUnits){               // chunk <=6 sesuai limit
   if(!need.length) return;
   $("msLoading").classList.remove("hidden");
   try{
-    for(let i=0;i<need.length;i+=6){
-      const chunk = need.slice(i,i+6);
-      const r = await api({action:"menuItems", token:STATE.token, units:chunk});
+    const chunks=[]; for(let i=0;i<need.length;i+=6) chunks.push(need.slice(i,i+6));
+    const res=await Promise.all(chunks.map(ch=>api({action:"menuItems", token:STATE.token, units:ch})));
+    for(let ci=0;ci<chunks.length;ci++){
+      const chunk=chunks[ci], r=res[ci];
       if(!r.ok) throw new Error(r.error||"menuItems gagal");
       if(r.meta && r.meta.skippedStaleMonthly) $("msWarn").innerHTML =
         '<div class="cogs-banner warn">Menu_Sales_Monthly basi: '+r.meta.skippedStaleMonthly+' baris diabaikan, dipakai Menu_Sales_Current.</div>';
@@ -3014,15 +3075,16 @@ function closeSidebar(){ $("sidebar").classList.remove("open"); $("backdrop").cl
 $("hamb").onclick=openSidebar; $("backdrop").onclick=closeSidebar;
 
 /* logout & refresh di sidebar */
-$("logoutBtn2").onclick=async()=>{ try{ await api({action:"logout",token:STATE.token}); }catch(e){} location.reload(); };
+$("logoutBtn2").onclick=async()=>{ try{ await api({action:"logout",token:STATE.token}); }catch(e){} await IDB.clear(); location.reload(); };
 $("refreshBtn").onclick=reloadData;
 async function reloadData(){
   const btn=$("refreshBtn"); const old=btn.textContent; btn.disabled=true; btn.textContent="Memuat\u2026";
   try{
     const need=["Revenue_Master","Budget_Master","Forecast_Output","Event_Pipeline","DIM_UNIT","DIM_TANGGAL"];
-    const results=await getTabsBatch(need);
+    const results=await getTabsCached(need);
     need.forEach(t=>{ const r=results[t]; STATE.data[t]=(r&&r.ok)?rowsToObjs(r.headers,r.rows):[]; });
-    STATE._dayInfo=null;
+    STATE._dayInfo=null; memoClear(); DIMX=null;
+    if(GRP_LOADED.cost){ STATE.fresh=null; await loadCostTabs(); ensureFreshness(); renderCogs(); }
     computePeriod(); computeSectionC(); renderKPI(); renderTableC(); renderTableD();
     renderDailyChart(); renderSmallMultiples();
     toast("Data diperbarui");
