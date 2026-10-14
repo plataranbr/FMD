@@ -126,7 +126,7 @@ function renderNav() {
   const groups = [];
   visiblePages().forEach(p => { let g = groups.find(x => x.name === p.group); if (!g) groups.push(g = { name: p.group, items: [] }); g.items.push(p); });
   $("nav").innerHTML = groups.map(g => `<div class="nav-group"><h4>${esc(g.name)}</h4>${g.items.map(p =>
-    `<a class="nav-item" href="#/${p.id}" data-id="${p.id}">${esc(p.label)}${p.render ? "" : '<span class="soon">soon</span>'}</a>`).join("")}</div>`).join("");
+    `<a class="nav-item${p.render ? "" : " soon"}" href="#/${p.id}" data-id="${p.id}"${p.render ? "" : ' title="Not yet migrated — opens a link to the classic dashboard"'}>${esc(p.label)}</a>`).join("")}</div>`).join("");
   $("userName").textContent = STATE.name || "—";
   $("userSub").textContent = STATE.email || STATE.role || "";
   $("avatar").textContent = (STATE.name || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
