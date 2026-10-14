@@ -8,9 +8,11 @@ const itemKey = r => r.u + "|" + r.menu + "|" + r.serv;
 const itemName = r => r.menu + (r.serv ? " (" + r.serv + ")" : "");
 const median = a => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
 
+const PLS_OUTLETS = ["TIGADARI", "PIDARI"];
 function msScopeUnits() {
   const all = Menu.units.filter(u => MSU.cluster === "ALL" || Menu.cluster[u] === MSU.cluster);
-  const sel = MSU.units.filter(u => all.includes(u));
+  let sel = MSU.units.filter(u => all.includes(u));
+  if (sel.includes("PLS")) sel = [...new Set(sel.concat(PLS_OUTLETS.filter(u => all.includes(u))))];   // PLS = Jan–Mar gabungan + Tigadari & Pidari
   return { all, sel: sel.length ? sel : all };
 }
 /** baris item terfilter. opts.months: override rentang; opts.noListing: abaikan filter listing */
@@ -143,7 +145,8 @@ FMD.page("revenue/menu", {
 
       host.innerHTML = `
         <section class="card" style="padding:14px 18px;gap:10px"><div class="filters" id="msF1"></div><div id="msUnits"></div><div class="filters" id="msF2"></div>
-          <span class="muted" style="font-size:12px"><span class="dot" aria-hidden="true"></span> ${esc(t("All units are cached; changing units does not reload data."))}</span></section>
+          <span class="muted" style="font-size:12px"><span class="dot" aria-hidden="true"></span> ${esc(t("All units are cached; changing units does not reload data."))}</span>
+          ${Menu.units.includes("PLS") ? `<span class="muted" style="font-size:12px">${esc(t("PLS: Jan–Mar comes from the monthly POS file and is not split into Tigadari / Pidari; selecting PLS also includes Tigadari and Pidari."))}</span>` : ""}</section>
         ${warn.length ? UI.banner(t("Item-level data does not match the monthly summary for {l}. Item tables for these months may be incomplete; check that Menu_Sales_Monthly in the Sheet is up to date.", { l: joinList(warn.map(w => `${monthLabel(w.m)} (${fmt(w.item)} vs ${fmt(w.agg)})`)) }), "warn") : ""}
         ${badList.length ? `<div class="banner warn" role="note" style="flex-direction:column;gap:6px"><div>${esc(t("Item totals do not match the daily totals for {n} unit-months in this range — usually a source sheet still holding another month’s data or a unit-month that was re-extracted only partly.", { n: badList.length }))}</div>
           <div style="font-size:12px">${esc(badList.map(b => `${menuUnitLabel(b.u)} ${monthName(b.m)}: ${fmt(b.item)} vs ${fmt(b.daily)}`).join(" · "))}</div>

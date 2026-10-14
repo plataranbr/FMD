@@ -3,7 +3,7 @@
 
 const MENU_CHUNK = 6;                                   // batas server menuItems per request
 // Sumber = SALES ITEM: "PLS" hanya muncul di bulan dari file bulanan POS (Tigadari+Pidari belum terpisah); EVENT = sheet event eksternal
-const MENU_UNIT_LABEL = { PLS: () => t("PLS (Tigadari + Pidari combined)"), EVENT: () => t("External events") };
+const MENU_UNIT_LABEL = { PLS: () => "PLS", EVENT: () => t("External events") };
 const menuUnitLabel = u => MENU_UNIT_LABEL[u] ? MENU_UNIT_LABEL[u]() : u;
 const MENU_EVENT_CG = "Event & Package";
 const isEventItem = r => r.g === "EVENT" || r.cg === MENU_EVENT_CG;

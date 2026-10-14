@@ -1,7 +1,8 @@
 /* Terjemahan ID. Kunci = teks English persis seperti di kode ({var} wajib dipertahankan). */
 "use strict";
 const I18N_ID = {
-  "PLS (Tigadari + Pidari combined)": "PLS (Tigadari + Pidari gabungan)", "External events": "Event eksternal",
+  "PLS: Jan–Mar comes from the monthly POS file and is not split into Tigadari / Pidari; selecting PLS also includes Tigadari and Pidari.": "PLS: Jan–Mar berasal dari file bulanan POS dan tidak terpecah ke Tigadari / Pidari; memilih PLS otomatis menyertakan Tigadari dan Pidari.",
+  "External events": "Event eksternal",
   "events & packages {p}": "event & paket {p}", "Include events & packages": "Sertakan event & paket", "excluding events & packages": "tanpa event & paket",
   "excluded (no data for {m}): {l}": "dikecualikan (tanpa data {m}): {l}",
   "category filter not applied (daily data has no category yet)": "filter kategori tidak berlaku (data harian belum punya kategori)",
