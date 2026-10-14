@@ -31,14 +31,14 @@ const FMD = {
 };
 
 /* ---------- Tema ---------- */
-function applyTheme(t) {
-  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+function applyTheme(mode) {
+  if (mode === "light" || mode === "dark") document.documentElement.dataset.theme = mode;
   else delete document.documentElement.dataset.theme;
   const dark = isDark();
   const b = $("themeBtn");
   if (b) b.innerHTML = (dark
-    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Light'
-    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Dark');
+    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' + esc(t("Light"))
+    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>' + esc(t("Dark")));
   document.dispatchEvent(new CustomEvent("fmd:theme", { detail: { dark } }));
 }
 function isDark() {
@@ -71,7 +71,7 @@ function b64urlJson(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.l
   return JSON.parse(decodeURIComponent(escape(atob(s)))); }
 function initGoogle(tries = 0) {
   if (!(window.google && google.accounts && google.accounts.id)) {
-    if (tries > 75) { $("loginErr").textContent = "Google sign-in could not load. Check your connection or ad blocker, then reload."; return; }
+    if (tries > 75) { $("loginErr").textContent = t("Google sign-in could not load. Check your connection or ad blocker, then reload."); return; }
     return void setTimeout(() => initGoogle(tries + 1), 200);
   }
   google.accounts.id.initialize({ client_id: CFG.GOOGLE_CLIENT_ID, callback: onGoogle, auto_select: false, ux_mode: "popup" });
@@ -79,7 +79,7 @@ function initGoogle(tries = 0) {
 }
 function onGoogle(resp) {
   try { const p = b64urlJson(resp.credential.split(".")[1]); GID = { token: resp.credential, email: p.email || "" }; }
-  catch (e) { $("loginErr").textContent = "Google sign-in failed. Please try again."; return; }
+  catch (e) { $("loginErr").textContent = t("Google sign-in failed. Please try again."); return; }
   $("loginErr").textContent = ""; $("gEmail").textContent = GID.email;
   $("gsiBox").classList.add("hidden"); $("pinBox").classList.remove("hidden"); $("pin").focus();
 }
@@ -91,20 +91,20 @@ function resetGoogle() {
 async function doLogin() {
   const pin = $("pin").value.trim(), btn = $("loginBtn");
   $("loginErr").textContent = "";
-  if (!GID) return void ($("loginErr").textContent = "Please sign in with Google first.");
-  if (!pin) return void ($("loginErr").textContent = "Please enter your PIN.");
-  btn.disabled = true; btn.textContent = "Checking…";
+  if (!GID) return void ($("loginErr").textContent = t("Please sign in with Google first."));
+  if (!pin) return void ($("loginErr").textContent = t("Please enter your PIN."));
+  btn.disabled = true; btn.textContent = t("Checking…");
   try {
     const r = await api({ action: "login", pin, idToken: GID.token });
     if (!r.ok) {
-      $("loginErr").textContent = r.error || "Sign-in failed.";
+      $("loginErr").textContent = r.error || t("Sign-in failed.");
       if (/expired|invalid|Google/i.test(r.error || "") && !/registered/i.test(r.error || "")) resetGoogle();
       return;
     }
     saveSession(r); $("pin").value = ""; GID = null;
     await startApp();
-  } catch (e) { $("loginErr").textContent = "Connection failed: " + e.message; }
-  finally { btn.disabled = false; btn.textContent = "Sign in"; }
+  } catch (e) { $("loginErr").textContent = t("Connection failed: {e}", { e: e.message }); }
+  finally { btn.disabled = false; btn.textContent = t("Sign in"); }
 }
 function showLogin(msg) {
   $("app").classList.add("hidden"); $("login").classList.remove("hidden");
@@ -117,7 +117,7 @@ async function signOut() {
 }
 document.addEventListener("fmd:session-expired", () => {
   if (!STATE.token) return;
-  clearSession(); showLogin("Your session has expired. Please sign in again.");
+  clearSession(); showLogin(t("Your session has expired. Please sign in again."));
 });
 
 /* ---------- Sidebar ---------- */
@@ -125,8 +125,8 @@ function visiblePages() { return PAGES.filter(p => p.need.every(allowedTab)); }
 function renderNav() {
   const groups = [];
   visiblePages().forEach(p => { let g = groups.find(x => x.name === p.group); if (!g) groups.push(g = { name: p.group, items: [] }); g.items.push(p); });
-  $("nav").innerHTML = groups.map(g => `<div class="nav-group"><h4>${esc(g.name)}</h4>${g.items.map(p =>
-    `<a class="nav-item${p.render ? "" : " soon"}" href="#/${p.id}" data-id="${p.id}"${p.render ? "" : ' title="Not yet migrated — opens a link to the classic dashboard"'}>${esc(p.label)}</a>`).join("")}</div>`).join("");
+  $("nav").innerHTML = groups.map(g => `<div class="nav-group"><h4>${esc(t(g.name))}</h4>${g.items.map(p =>
+    `<a class="nav-item${p.render ? "" : " soon"}" href="#/${p.id}" data-id="${p.id}"${p.render ? "" : ` title="${esc(t("Not yet migrated — opens a link to the classic dashboard"))}"`}>${esc(t(p.label))}</a>`).join("")}</div>`).join("");
   $("userName").textContent = STATE.name || "—";
   $("userSub").textContent = STATE.email || STATE.role || "";
   $("avatar").textContent = (STATE.name || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -135,6 +135,9 @@ function markNav(id) { document.querySelectorAll(".nav-item").forEach(a => a.dat
 
 /* ---------- Router (hash: #/group/page) ---------- */
 function routeId() { const h = location.hash.replace(/^#\/?/, "").split("?")[0]; return h || DEFAULT_PAGE; }
+/** parameter di hash: #/revenue/daily?outlet=PLS&m=2026-10 */
+function routeParams() { const q = location.hash.split("?")[1] || ""; const o = {}; q.split("&").filter(Boolean).forEach(kv => { const [k, v] = kv.split("="); o[decodeURIComponent(k)] = decodeURIComponent(v || ""); }); return o; }
+function pageLink(id, params) { const q = Object.entries(params || {}).filter(([, v]) => v != null && v !== "").map(([k, v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v)).join("&"); return "#/" + id + (q ? "?" + q : ""); }
 async function route() {
   if (!STATE.token) return;
   const id = routeId(), seq = ++FMD._seq;
@@ -143,36 +146,36 @@ async function route() {
   document.body.classList.remove("nav-open");
   if (FMD._cleanup) { try { FMD._cleanup(); } catch (e) {} FMD._cleanup = null; }
   FMD.current = p; markNav(p.id);
-  $("crumb").textContent = p.group; $("pageTitle").textContent = p.label;
-  document.title = p.label + " · FMD";
+  $("crumb").textContent = t(p.group); $("pageTitle").textContent = t(p.label);
+  document.title = t(p.label) + " · FMD";
   const host = $("view"); host.innerHTML = ""; window.scrollTo(0, 0);
-  if (!p.need.every(allowedTab)) { host.innerHTML = UI.card({ body: UI.empty("Your account does not have access to this page. Contact Finance if you need it.") }); return; }
+  if (!p.need.every(allowedTab)) { host.innerHTML = UI.card({ body: UI.empty(t("Your account does not have access to this page. Contact Finance if you need it.")) }); return; }
   if (!p.render) { host.innerHTML = placeholder(p); return; }
   try {
     const cleanup = await p.render(host, { isStale: () => seq !== FMD._seq });
     if (seq === FMD._seq && typeof cleanup === "function") FMD._cleanup = cleanup;
   } catch (e) {
     console.error(e);
-    if (seq === FMD._seq) host.innerHTML = UI.card({ body: UI.banner("This page failed to load: " + e.message, "crit") });
+    if (seq === FMD._seq) host.innerHTML = UI.card({ body: UI.banner(t("This page failed to load: {e}", { e: e.message }), "crit") });
   }
 }
 function placeholder(p) {
-  return UI.card({ title: p.label, sub: p.group,
+  return UI.card({ title: t(p.label), sub: t(p.group),
     body: `<div class="empty" style="display:flex;flex-direction:column;gap:12px;align-items:center">
-      <span>This page is being rebuilt in the new layout. Until it is ready, please use the classic dashboard.</span>
-      <a class="btn" href="${CFG.CLASSIC_URL}">Open classic dashboard</a></div>` });
+      <span>${esc(t("This page is being rebuilt in the new layout. Until it is ready, please use the classic dashboard."))}</span>
+      <a class="btn" href="${CFG.CLASSIC_URL}">${esc(t("Open classic dashboard"))}</a></div>` });
 }
 
 /* ---------- Topbar: freshness & refresh ---------- */
 function renderFresh() {
   const d = STATE.lastActualDate;
-  $("fresh").innerHTML = d ? `<span class="dot" aria-hidden="true"></span>Revenue through <b>${esc(dateLabel(d))}</b>` : "";
+  $("fresh").innerHTML = d ? `<span class="dot" aria-hidden="true"></span>${esc(t("Revenue through"))} <b>${esc(dateLabel(d))}</b>` : "";
   $("fresh").classList.toggle("hidden", !d);
 }
 async function refreshAll() {
   const b = $("refreshBtn"); b.disabled = true;
-  try { await Data.load(Data.loaded(), true); UI.toast("Data is up to date"); route(); }
-  catch (e) { UI.toast("Refresh failed: " + e.message); }
+  try { await Data.load(Data.loaded(), true); UI.toast(t("Data is up to date")); route(); }
+  catch (e) { UI.toast(t("Refresh failed: {e}", { e: e.message })); }
   finally { b.disabled = false; }
 }
 document.addEventListener("fmd:data", renderFresh);
@@ -186,7 +189,7 @@ async function startApp() {
     if (missing.length) console.warn("Missing tabs", missing);
   } catch (e) {
     if (!STATE.token) return; // sesi kedaluwarsa -> sudah di layar login
-    $("view").innerHTML = UI.card({ body: UI.banner("Could not load reference data: " + e.message, "crit") });
+    $("view").innerHTML = UI.card({ body: UI.banner(t("Could not load reference data: {e}", { e: e.message }), "crit") });
     return;
   }
   renderFresh();
@@ -203,6 +206,13 @@ function wire() {
   $("menuBtn").onclick = () => document.body.classList.toggle("nav-open");
   $("scrim").onclick = () => document.body.classList.remove("nav-open");
   window.addEventListener("hashchange", route);
+  document.querySelectorAll(".lang-seg").forEach(el => el.addEventListener("click", e => { const b = e.target.closest("button[data-lang]"); if (b && b.dataset.lang !== LANG) setLang(b.dataset.lang); }));
+  document.addEventListener("fmd:lang", () => {
+    document.querySelectorAll(".lang-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === LANG));
+    applyTheme(document.documentElement.dataset.theme);
+    if (STATE.token) { renderNav(); renderFresh(); route(); }
+  });
+  setLang(LANG);
   applyTheme(Store.get("localStorage", CFG.THEME_KEY));
   initGoogle();
   if (loadSession()) startApp(); else showLogin("");
