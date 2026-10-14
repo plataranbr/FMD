@@ -129,16 +129,20 @@ function crossPage(id, cls) {
           const ls = lines.filter(l => (S.view === "item" ? l.item : l.cat) === p.name && (S.openU ? l.k === S.openU : o.keys.has(l.k)));
           const head = `<div style="font-weight:600;margin-bottom:6px">${esc(p.name)} · ${esc(S.openU ? S.openU : t("all units shown"))}${S.openU ? ` <span class="muted" style="font-weight:400">${esc(t("— select the row name for all units"))}</span>` : ` <span class="muted" style="font-weight:400">${esc(t("— select a unit’s value for that unit only"))}</span>`}</div>`;
           if (S.view === "cat") {   // item terbesar dalam kategori
-            const it = {}; ls.forEach(l => { const x = (it[l.item] = it[l.item] || { amt: 0, u: {} }); x.amt += l.amt; x.u[l.k] = (x.u[l.k] || 0) + l.amt; });
-            const top = Object.entries(it).sort((a, b) => b[1].amt - a[1].amt).slice(0, 8);
-            return head + `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Largest items"))}</div>` + top.map(([n, x]) => { const big = Object.entries(x.u).sort((a, b) => b[1] - a[1])[0];
-              return `<div class="kv"><span>${esc(n)}</span><span class="num">${esc(fmt(x.amt))} <span class="muted">· ${esc(t("largest: {u}", { u: big[0] }))}</span></span></div>`; }).join("");
+            const it = {}; ls.forEach(l => { const x = (it[l.item] = it[l.item] || { amt: 0, qty: 0, u: {} }); x.amt += l.amt; x.qty += Number(l.qty) || 0; x.u[l.k] = (x.u[l.k] || 0) + l.amt; });
+            const top = Object.entries(it).sort((a, b) => b[1].amt - a[1].amt).slice(0, 10);
+            if (!top.length) return head + UI.empty(t("No lines for this unit."));
+            return head + `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Largest items"))}</div>
+              <div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>${esc(t("Item"))}</th><th class="r">${esc(t("Qty"))}</th><th class="r">${esc(t("Amount"))}</th><th class="r">${esc(t("Avg price"))}</th>${S.openU ? "" : `<th>${esc(t("Largest unit"))}</th>`}</tr></thead><tbody>` +
+              top.map(([n, x]) => { const big = Object.entries(x.u).sort((a, b) => b[1] - a[1])[0];
+                return `<tr><td>${esc(n)}</td><td class="r"><span class="num">${esc(x.qty ? fmtNum(x.qty) : DASH)}</span></td><td class="r"><span class="num">${esc(fmt(x.amt))}</span></td><td class="r"><span class="num">${esc(x.qty ? fmtInt(x.amt / x.qty) : DASH)}</span></td>${S.openU ? "" : `<td>${esc(big[0])}</td>`}</tr>`; }).join("") +
+              `</tbody></table></div><div class="muted" style="font-size:11px;margin-top:4px">${esc(t("Qty is in each item’s own unit (kg, pcs, btl…) and is not added across items."))}</div>`;
           }
           const w = {}; ls.forEach(l => { const key = l.src + "|" + l.who + "|" + l.k, x = (w[key] = w[key] || { src: l.src, who: l.who, k: l.k, amt: 0, qty: 0, last: "", price: null });
             x.amt += l.amt; x.qty += l.qty; if (l.d >= x.last) { x.last = l.d; if (l.price) x.price = l.price; } });
           const ws = Object.values(w).sort((a, b) => b.amt - a.amt).slice(0, 12), ps = ws.map(x => x.price).filter(v => v > 0), mn = ps.length ? Math.min(...ps) : null;
           return head + `<div class="muted" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">${esc(t("Supplier (DML) or issuing store (SR)"))}</div>` + (ws.length ? "" : UI.empty(t("No lines for this unit."))) + ws.map(x =>
-            `<div class="kv"><span>${UI.tag(x.src, x.src === "DML" ? "info" : "mute")} ${esc(x.who || DASH)} → <b>${esc(x.k)}</b></span><span class="num">${esc(fmtNum(x.qty))} · ${esc(fmt(x.amt))}${x.price ? ` · ${esc(fmtInt(x.price))}` : ""}${mn != null && x.price && ps.length > 1 ? " " + (x.price === mn ? UI.tag(t("lowest"), "ok") : UI.tag("+" + fmtPct((x.price - mn) / mn, 0), "crit")) : ""} <span class="muted">· ${esc(dateLabel(x.last, true))}</span></span></div>`).join("");
+            `<div class="kv"><span>${UI.tag(x.src, x.src === "DML" ? "info" : "mute")} ${esc(x.who || DASH)} → <b>${esc(x.k)}</b></span><span class="num">${esc(t("Qty"))} ${esc(fmtNum(x.qty))} · ${esc(fmt(x.amt))}${x.price ? ` · @${esc(fmtInt(x.price))}` : x.qty ? ` · @${esc(fmtInt(x.amt / x.qty))}` : ""}${mn != null && x.price && ps.length > 1 ? " " + (x.price === mn ? UI.tag(t("lowest"), "ok") : UI.tag("+" + fmtPct((x.price - mn) / mn, 0), "crit")) : ""} <span class="muted">· ${esc(dateLabel(x.last, true))}</span></span></div>`).join("");
         }
       };
       draw();

@@ -1,6 +1,9 @@
 /* Terjemahan ID. Kunci = teks English persis seperti di kode ({var} wajib dipertahankan). */
 "use strict";
 const I18N_ID = {
+  "Avg price": "Harga rata-rata",
+  "Largest unit": "Unit terbesar",
+  "Qty is in each item’s own unit (kg, pcs, btl…) and is not added across items.": "Qty memakai satuan masing-masing item (kg, pcs, btl…) dan tidak dijumlah antar-item.",
   "Show daily detail": "Lihat rincian harian",
   "Daily detail — {u}": "Rincian harian — {u}",
   "daily ratios are indicative: purchases often cover several days": "rasio harian indikatif: belanja sering untuk beberapa hari",
