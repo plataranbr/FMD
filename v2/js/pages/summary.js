@@ -3,10 +3,10 @@
 
 const SUM_CFG = {
   ACH_CRIT: 0.8, ACH_WARN: 0.9,
-  EVENT_DAYS: 21, EVENT_RATIO: 1.0, EVENT_MIN_RP: 50e6, // ambang event signifikan (usulan; konfirmasi Ans)
+  EVENT_DAYS: 7, EVENTS_SHOWN: 8,
   RELIABLE_MIN: 0.7, ATTN_MAX: 4, ALERTS_SHOWN: 6,
 };
-const SUM_UI = { cluster: "ALL", view: "daily", sev: "all", showAll: false };
+const SUM_UI = { cluster: "ALL", outlet: "ALL", view: "daily", sev: "all", showAll: false };
 
 const joinList = a => a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
 const rp = (n, dp) => fmtRp(n, dp);
@@ -28,10 +28,8 @@ function summaryModel(cluster) {
   // event signifikan: nilai ≥ rasio × rata-rata revenue harian outlet MTD
   const avgDaily = {}; rows.forEach(r => (avgDaily[r.key] = elapsed ? r.mtd / elapsed : 0));
   const events = Rev.events(cluster, SUM_CFG.EVENT_DAYS).map(e => {
-    const base = avgDaily[e.outlet] || 0, ratio = base > 0 ? e.value / base : null;
-    return { ...e, ratio, significant: e.value >= SUM_CFG.EVENT_MIN_RP && (ratio == null ? e.value > 0 : ratio >= SUM_CFG.EVENT_RATIO) };
-  });
-  const sigEvents = events.filter(e => e.significant);
+    const base = avgDaily[e.outlet] || 0; return { ...e, ratio: base > 0 ? e.value / base : null };
+  }).sort((a, b) => b.value - a.value || a.date.localeCompare(b.date));
 
   // ---- alert rule-based ----
   const alerts = []; let checks = 0;
@@ -74,21 +72,21 @@ function summaryModel(cluster) {
   checks++;
   if (prevSame > 0) parts.push(`MTD revenue is ${fmtPct(T.mtd / prevSame - 1)} ${T.mtd >= prevSame ? "above" : "below"} the same ${elapsed} days of ${monthLabel(prevM, true).split(" ")[0]}.`);
   if (lag.length) parts.push(`Data for ${joinList(lag.map(r => r.key))} is behind.`);
-  if (sigEvents.length) parts.push(`${sigEvents.length} significant event${sigEvents.length > 1 ? "s" : ""} worth ${rp(sigEvents.reduce((s, e) => s + e.value, 0))} ${sigEvents.length > 1 ? "are" : "is"} scheduled in the next ${SUM_CFG.EVENT_DAYS} days.`);
+  if (events.length) parts.push(`${events.length} event${events.length > 1 ? "s" : ""} worth ${rp(events.reduce((s, e) => s + e.value, 0))} ${events.length > 1 ? "are" : "is"} scheduled in the next ${SUM_CFG.EVENT_DAYS} days.`);
 
   const attn = budgeted.filter(r => r.ach < SUM_CFG.ACH_WARN).sort((a, b) => b.gap - a.gap).slice(0, SUM_CFG.ATTN_MAX)
     .map(r => ({ ...r, reason: (lag.find(x => x.key === r.key) ? "Data behind · " : "") + "Gap " + rp(r.gap) }));
-  return { m, last, rows, T, daysIn, elapsed, remain, prevSame, prevM, reliability, alerts, checks, brief: parts.join(" "), attn, events, sigEvents };
+  return { m, last, rows, T, daysIn, elapsed, remain, prevSame, prevM, reliability, alerts, checks, brief: parts.join(" "), attn, events };
 }
 
 /* ---------- Chart ---------- */
-function summaryChart(canvas, M, view) {
+function summaryChart(canvas, M, view, rows) {
   if (typeof Chart !== "function" || !Chart.register) { canvas.parentElement.innerHTML = UI.empty("Chart library could not load."); return null; }
   const c = { accent: cssVar("--accent"), fc: cssVar("--fc"), orange: cssVar("--orange"), pink: cssVar("--pink"), ev: cssVar("--ev-bar"), muted: cssVar("--muted"), line: cssVar("--line"), ink: cssVar("--ink"), track: cssVar("--track") };
   Chart.defaults.font.family = "Poppins, system-ui, sans-serif"; Chart.defaults.color = c.muted;
   const yTicks = { callback: v => fmt(v, 1), color: c.muted }, grid = { color: c.line };
   if (view === "monthly") {
-    const s = Rev.monthlySeries(M.rows);
+    const s = Rev.monthlySeries(rows);
     return new Chart(canvas, { type: "bar", data: { labels: s.map(x => MONTHS[+x.m.slice(5, 7) - 1]), datasets: [
       { label: "Actual", data: s.map(x => x.actual), backgroundColor: c.accent, stack: "a", borderRadius: 8, maxBarThickness: 26 },
       { label: "Forecast", data: s.map(x => x.forecast || null), backgroundColor: c.fc, stack: "a", borderRadius: 8, maxBarThickness: 26 },
@@ -97,8 +95,8 @@ function summaryChart(canvas, M, view) {
         tooltip: { callbacks: { label: x => x.dataset.label + ": " + fmtRp(x.parsed.y) } } },
         scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: yTicks, grid } } } });
   }
-  const s = Rev.dailySeries(M.rows), info = s.dates.map(d => Rev.dayInfo(d));
-  const budDaily = M.T.budget > 0 ? M.T.budget / M.daysIn : null;
+  const s = Rev.dailySeries(rows), info = s.dates.map(d => Rev.dayInfo(d));
+  const bud = rows.reduce((t, r) => t + (r.budget || 0), 0), budDaily = bud > 0 ? bud / M.daysIn : null;
   const pt = base => info.map(x => x.holiday ? c.pink : x.weekend ? c.orange : base);
   return new Chart(canvas, { data: { labels: s.dates.map(d => String(+d.slice(8, 10))), datasets: [
     { type: "line", label: "Actual", data: s.actual, borderColor: c.accent, backgroundColor: pt(c.accent), pointBorderColor: pt(c.accent), pointRadius: 4, borderWidth: 3, tension: .25, spanGaps: false, order: 1 },
@@ -109,8 +107,7 @@ function summaryChart(canvas, M, view) {
       plugins: { legend: { display: false }, tooltip: { callbacks: {
         title: it => { const d = s.dates[it[0].dataIndex], x = info[it[0].dataIndex]; return dateLabel(d) + " (" + x.dow + ")" + (x.holiday ? " · " + (x.note || "Public holiday") : ""); },
         label: x => x.parsed.y == null ? null : x.dataset.label + ": " + fmtRp(x.parsed.y) } } },
-      scales: { x: { grid: { display: false }, ticks: { color: ctx => { const x = info[ctx.index]; return x && x.holiday ? c.pink : x && x.weekend ? c.orange : c.muted; }, autoSkip: false, maxRotation: 0,
-        callback: (v, i) => (i % 2 === 0 || info[i].weekend || info[i].holiday) ? String(i + 1) : "" } }, y: { ticks: yTicks, grid, beginAtZero: true } } } });
+      scales: { x: { grid: { display: false }, ticks: { color: ctx => { const x = info[ctx.index]; return x && x.holiday ? c.pink : x && x.weekend ? c.orange : c.muted; }, autoSkip: canvas.clientWidth < 640, maxRotation: 0, font: { size: 11 } } }, y: { ticks: yTicks, grid, beginAtZero: true } } } });
 }
 
 /* ---------- Render ---------- */
@@ -174,9 +171,9 @@ FMD.page("overview/summary", {
                 <div class="muted" style="font-size:12px">${esc(r.reason)}</div></div>${achTag(r)}</div>`).join("")
                 : UI.empty("All budgeted outlets are projected at 90% of budget or above.")}
               <a href="#/revenue/outlet" style="font-size:13px">View all outlets</a></div>
-            <div class="card"><div><h2 style="margin:0;font-size:17px">Upcoming Significant Events</h2>
-              <div class="sub muted" style="font-size:12px">Next ${SUM_CFG.EVENT_DAYS} days · value ≥ ${SUM_CFG.EVENT_RATIO * 100}% of the outlet’s average daily revenue (MTD) and ≥ ${rp(SUM_CFG.EVENT_MIN_RP, 0)}</div></div>
-              ${M.sigEvents.length ? M.sigEvents.slice(0, 6).map(e => { const d = daysBetween(M.last, e.date);
+            <div class="card"><div><h2 style="margin:0;font-size:17px">Upcoming Events — Next ${SUM_CFG.EVENT_DAYS} Days</h2>
+              <div class="sub muted" style="font-size:12px">${esc(dateLabel(addDays(M.last, 1)))} – ${esc(dateLabel(addDays(M.last, SUM_CFG.EVENT_DAYS)))} · sorted by value · ${M.events.length} event${M.events.length === 1 ? "" : "s"}, ${esc(rp(M.events.reduce((t, e) => t + e.value, 0)))}</div></div>
+              ${M.events.length ? M.events.slice(0, SUM_CFG.EVENTS_SHOWN).map(e => { const d = daysBetween(M.last, e.date);
                 return `<div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">
                 <div style="flex:0 0 48px;height:52px;border-radius:14px;background:var(--soft);display:flex;flex-direction:column;align-items:center;justify-content:center">
                   <span style="font-size:17px;font-weight:700;line-height:1">${+e.date.slice(8, 10)}</span><span class="muted" style="font-size:10px;text-transform:uppercase">${MONTHS[+e.date.slice(5, 7) - 1]}</span></div>
@@ -184,9 +181,9 @@ FMD.page("overview/summary", {
                   <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(e.name)}</span><span class="num" style="font-size:13px;font-weight:600;white-space:nowrap">${esc(rp(e.value))}</span></div>
                   <div class="muted" style="font-size:12px">${esc(e.outlet)} · ${e.pax ? fmtInt(e.pax) + " pax" : "pax n/a"} · in ${d} day${d > 1 ? "s" : ""}</div>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">${UI.tag(e.definite ? "Definite" : (e.status || "Tentative"), e.definite ? "ok" : "warn")}${e.ratio != null ? UI.tag(e.ratio.toFixed(1) + "× daily average", e.ratio >= 2 ? "info" : "mute") : ""}</div></div></div>`; }).join("")
-                : UI.empty("No significant events in the next " + SUM_CFG.EVENT_DAYS + " days.")}
-              ${M.sigEvents.length > 6 ? `<div class="muted" style="font-size:12px">+${M.sigEvents.length - 6} more</div>` : ""}
-              <a href="#/revenue/events" style="font-size:13px">View event pipeline (${M.events.length} in window)</a></div>
+                : UI.empty("No events in the next " + SUM_CFG.EVENT_DAYS + " days.")}
+              ${M.events.length > SUM_CFG.EVENTS_SHOWN ? `<div class="muted" style="font-size:12px">+${M.events.length - SUM_CFG.EVENTS_SHOWN} more</div>` : ""}
+              <a href="#/revenue/events" style="font-size:13px">View event pipeline</a></div>
           </div>
         </section>
         <section class="card">
@@ -194,18 +191,23 @@ FMD.page("overview/summary", {
           <div id="chLegend" style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted)"></div>
           <div style="position:relative;height:280px"><canvas id="sumChart" aria-label="Revenue chart" role="img"></canvas></div>
         </section>`;
-      host.querySelector(".filters").appendChild(UI.clusterSelect(SUM_UI.cluster, v => { SUM_UI.cluster = v; SUM_UI.showAll = false; draw(); }));
+      host.querySelector(".filters").appendChild(UI.clusterSelect(SUM_UI.cluster, v => { SUM_UI.cluster = v; SUM_UI.outlet = "ALL"; SUM_UI.showAll = false; draw(); }));
       host.querySelectorAll("[data-sev]").forEach(b => b.onclick = () => { SUM_UI.sev = b.dataset.sev; SUM_UI.showAll = false; draw(); });
       const more = host.querySelector("#alertMore"); if (more) more.onclick = () => { SUM_UI.showAll = !SUM_UI.showAll; draw(); };
       const daily = SUM_UI.view === "daily";
       $("chTitle").textContent = daily ? "Daily Revenue — Actual & Forecast" : "Revenue vs Budget — Year to Date";
       $("chSub").textContent = daily ? `${monthLabel(M.m, true)} · actual through ${dateLabel(M.last)}, forecast for the remaining days` : `${monthLabel(M.m).slice(0, 3)} bar = MTD actual + forecast for the remaining days`;
+      if (SUM_UI.outlet !== "ALL" && !M.rows.some(r => r.key === SUM_UI.outlet)) SUM_UI.outlet = "ALL";
+      const cRows = SUM_UI.outlet === "ALL" ? M.rows : M.rows.filter(r => r.key === SUM_UI.outlet);
+      const cName = SUM_UI.outlet === "ALL" ? (SUM_UI.cluster === "ALL" ? "All outlets" : "All " + SUM_UI.cluster + " outlets") : SUM_UI.outlet + " — " + cRows[0].name;
+      $("chSub").textContent = cName + " · " + $("chSub").textContent;
+      $("chTools").appendChild(UI.select("Outlet", [["ALL", SUM_UI.cluster === "ALL" ? "All outlets" : "All " + SUM_UI.cluster]].concat(M.rows.map(r => [r.key, Dim.outletDisplay(r.key) + " — " + r.name])), SUM_UI.outlet, v => { SUM_UI.outlet = v; draw(); }));
       $("chTools").appendChild(UI.seg([["daily", "Daily"], ["monthly", "Monthly"]], SUM_UI.view, v => { SUM_UI.view = v; draw(); }, "Chart view"));
       const sw = (bg, dash) => `<span style="display:flex;align-items:center;gap:6px"><span style="width:18px;${dash ? `border-top:3px dashed ${bg}` : `height:10px;border-radius:3px;background:${bg}`}"></span>`;
       $("chLegend").innerHTML = daily
         ? `${sw("var(--accent)")}Actual</span>${sw("var(--fc)", 1)}Forecast</span>${sw("var(--orange)", 1)}Budget (daily average)</span>${sw("var(--ev-bar)")}Event value in forecast</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--orange)"></span>Weekend</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--pink)"></span>Public holiday</span>`
         : `${sw("var(--accent)")}Actual</span>${sw("var(--fc)")}Forecast</span>${sw("var(--orange)")}Budget</span>`;
-      chart = summaryChart($("sumChart"), M, SUM_UI.view);
+      chart = summaryChart($("sumChart"), M, SUM_UI.view, cRows);
     };
     draw();
     const onTheme = () => draw();
