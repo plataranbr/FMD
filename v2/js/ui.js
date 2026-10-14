@@ -119,8 +119,6 @@ const UI = (() => {
       });
     };
     const shownRows = all => st.topN ? all.slice(0, st.topN) : all;
-    const matchQ = r => { if (!st.q) return true; const q = st.q.toLowerCase();
-      return cols.some(c => (!c.type || c.type === "text") && String((c.get ? c.get(r) : r[c.key]) ?? "").toLowerCase().includes(q)); };
     const totalRow = () => {
       const tot = opts.total; if (!tot) return null;
       if (typeof tot === "function") return tot(st.rows);
@@ -131,7 +129,7 @@ const UI = (() => {
       return tot;
     };
     function draw() {
-      const all = sorted().filter(matchQ), shown = shownRows(all), render = shown.slice(0, st.maxRender), tot = totalRow(); st.shown = render;
+      const all = sorted(), shown = shownRows(all), render = shown.slice(0, st.maxRender), tot = totalRow(); st.shown = render;
       const vis = cols.filter(c => !c.hidden);
       el.querySelector("thead").innerHTML = "<tr>" + vis.map(c => {
         const s = c.sortable !== false, on = st.sort && st.sort.key === c.key;
@@ -147,10 +145,6 @@ const UI = (() => {
       const top = el.querySelector("[data-top]");
       top.innerHTML = `<span>${all.length ? t("Showing {a} of {b}", { a: fmtInt(render.length), b: fmtInt(all.length) }) + (capped ? " " + t("(use Copy for the full list)") : "") : ""}</span><span class="card-tools"></span>`;
       const tools = top.querySelector(".card-tools");
-      if (opts.search) { const q = node(`<input type="search" class="tbl-q" placeholder="${esc(t("Search"))}" aria-label="${esc(t("Search"))}" value="${esc(st.q || "")}">`);
-        let tm = null; q.addEventListener("input", e => { clearTimeout(tm); tm = setTimeout(() => { st.q = e.target.value.trim(); draw();
-          const i = el.querySelector(".tbl-q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 200); });
-        tools.appendChild(q); }
       if (st.topN !== null) tools.appendChild(seg([[10, "Top 10"], [20, "Top 20"], [50, "Top 50"], [0, t("All")]], st.topN, v => { st.topN = +v; draw(); }, t("Rows shown")));
       if (opts.copy !== false) {
         const b = node(`<button type="button" class="btn" title="${t("Copy as tab-separated text, ready to paste into Excel")}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>${shown.length === all.length ? t("Copy all") : t("Copy {n}", { n: fmtInt(shown.length) })}</button>`);

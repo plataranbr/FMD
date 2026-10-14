@@ -111,9 +111,8 @@ function showLogin(msg) {
   resetGoogle(); $("loginErr").textContent = msg || "";
 }
 async function signOut() {
-  const tok = STATE.token; clearSession();
-  if (tok) api({ action: "logout", token: tok }).catch(() => {});
-  await IDB.clear();   // sama dgn FMD lama: data keuangan tidak tertinggal di browser (PC bersama)
+  const t = STATE.token; clearSession();
+  if (t) api({ action: "logout", token: t }).catch(() => {});
   showLogin("");
 }
 document.addEventListener("fmd:session-expired", () => {
