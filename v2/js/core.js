@@ -30,7 +30,7 @@ async function api(payload) {
   const txt = await res.text();
   console.debug("[api]", payload.action, Math.round(performance.now() - t0) + "ms", Math.round(txt.length / 1024) + "KB");
   let r;
-  try { r = JSON.parse(txt); } catch (e) { throw new Error(t("Server returned an unreadable response.")); }
+  try { r = JSON.parse(txt); } catch (e) { throw new Error("Server returned an unreadable response."); }
   if (r && r.ok === false && SESSION_ERR.test(r.error || "") && payload.action !== "login") {
     document.dispatchEvent(new CustomEvent("fmd:session-expired"));
   }
@@ -124,31 +124,24 @@ function addDays(iso, n) { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(
 function monthEnd(m) { const d = new Date(m.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(0); return d.toISOString().slice(0, 10); }
 function addMonths(m, n) { const d = new Date(m.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); }
 function daysBetween(a, b) { return Math.round((new Date(b + "T00:00:00Z") - new Date(a + "T00:00:00Z")) / 86400000); }
-/* nama bulan/hari ikut bahasa (i18n.js) */
-const monthLabel = (m, long) => { const i = +m.slice(5, 7) - 1; return (long ? mFull(i) : mShort(i)) + " " + m.slice(0, 4); };
-const monthName = (m, long) => long ? mFull(+m.slice(5, 7) - 1) : mShort(+m.slice(5, 7) - 1);
-const dateLabel = (iso, noYear) => iso ? (+iso.slice(8, 10)) + " " + mShort(+iso.slice(5, 7) - 1) + (noYear ? "" : " " + iso.slice(0, 4)) : "—";
-const dowOf = iso => dowShort(new Date(iso + "T00:00:00Z").getUTCDay());
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthLabel = (m, long) => { const i = +m.slice(5, 7) - 1; return (long ? ["January","February","March","April","May","June","July","August","September","October","November","December"][i] : MONTHS[i]) + " " + m.slice(0, 4); };
+const dateLabel = iso => iso ? (+iso.slice(8, 10)) + " " + MONTHS[+iso.slice(5, 7) - 1] + " " + iso.slice(0, 4) : "—";
 
 /* ---------- Format angka (UI English; uang Bio/Mio sesuai konvensi) ---------- */
 const DASH = "—";
 const isNum = n => n != null && n !== "" && isFinite(n);
-/* desimal ikut bahasa: EN 11.05 · ID 11,05 (ribuan EN 1,000 · ID 1.000) */
-const decL = x => LANG === "id" ? x.replace(".", ",") : x;
-const LOCALE = () => (LANG === "id" ? "id-ID" : "en-US");
 function fmt(n, dp) {
   if (!isNum(n)) return DASH;
   n = Number(n); const a = Math.abs(n);
-  if (a >= 1e9) return decL((n / 1e9).toFixed(dp ?? 2)) + " Bio";
-  if (a >= 1e6) return decL((n / 1e6).toFixed(dp ?? 1)) + " Mio";
-  return Math.round(n).toLocaleString(LOCALE());
+  if (a >= 1e9) return (n / 1e9).toFixed(dp ?? 2) + " Bio";
+  if (a >= 1e6) return (n / 1e6).toFixed(dp ?? 1) + " Mio";
+  return Math.round(n).toLocaleString("en-US");
 }
 const fmtRp = (n, dp) => isNum(n) ? "Rp " + fmt(n, dp) : DASH;
-const fmtInt = n => isNum(n) ? Math.round(n).toLocaleString(LOCALE()) : DASH;
-const fmtNum = (n, dp = 2) => isNum(n) ? Number(n).toLocaleString(LOCALE(), { maximumFractionDigits: dp }) : DASH;
-const fmtPct = (r, dp = 1) => isNum(r) ? decL((r * 100).toFixed(dp)) + "%" : DASH;
-const fmtPts = (d, dp = 1) => isNum(d) ? (d >= 0 ? "+" : "") + decL((d * 100).toFixed(dp)) + " " + t("pts") : DASH;
-const fmtX = r => isNum(r) ? decL(r.toFixed(1)) + "×" : DASH;
+const fmtInt = n => isNum(n) ? Math.round(n).toLocaleString("en-US") : DASH;
+const fmtPct = (r, dp = 1) => isNum(r) ? (r * 100).toFixed(dp) + "%" : DASH;
+const fmtPts = (d, dp = 1) => isNum(d) ? (d >= 0 ? "+" : "") + (d * 100).toFixed(dp) + " pts" : DASH;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /* ---------- Clipboard ---------- */

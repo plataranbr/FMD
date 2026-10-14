@@ -11,7 +11,7 @@ const UI = (() => {
   }
 
   /* KPI card dengan ring. ratio 0..n (dibatasi 100% untuk ring). variant: orange | indigo | plain | pink */
-  function kpi({ label, value, note = "", ratio = null, ringText, variant = "plain", title = "", showRing = true, noteKind = "" }) {
+  function kpi({ label, value, note = "", ratio = null, ringText, variant = "plain", title = "" }) {
     const C = 2 * Math.PI * 26;
     const r = isNum(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
     const ring = { orange: ["rgba(255,255,255,.35)", "#FFFFFF"], indigo: ["rgba(255,255,255,.25)", "#FFFFFF"],
@@ -19,12 +19,12 @@ const UI = (() => {
     const cls = variant === "orange" || variant === "indigo" ? variant : "";
     const txt = ringText ?? (isNum(ratio) ? Math.round(ratio * 100) + "%" : DASH);
     return `<div class="kpi ${cls}" ${title ? `title="${esc(title)}"` : ""}>
-      <div class="kpi-txt"><div class="kpi-l">${esc(label)}</div><div class="kpi-v num">${esc(value)}</div><div class="kpi-n${noteKind ? " nk-" + noteKind : ""}">${esc(note)}</div></div>
-      ${showRing ? "" : "<!--"}<svg width="60" height="60" viewBox="0 0 64 64" aria-hidden="true">
+      <div class="kpi-txt"><div class="kpi-l">${esc(label)}</div><div class="kpi-v num">${esc(value)}</div><div class="kpi-n">${esc(note)}</div></div>
+      <svg width="60" height="60" viewBox="0 0 64 64" aria-hidden="true">
         <circle cx="32" cy="32" r="26" fill="none" stroke="${ring[0]}" stroke-width="6"/>
         <circle cx="32" cy="32" r="26" fill="none" stroke="${ring[1]}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C * r).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/>
         <text x="32" y="36" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">${esc(txt)}</text>
-      </svg>${showRing ? "" : "-->"}</div>`;
+      </svg></div>`;
   }
 
   function card({ title = "", sub = "", body = "", cls = "", id = "" }) {
@@ -59,16 +59,16 @@ const UI = (() => {
 
   /** Filter cluster dari DIM_UNIT.Grup */
   function clusterSelect(value, onChange) {
-    return select(t("Cluster"), [["ALL", t("All clusters")]].concat(Dim.x.clusters.map(c => [c, c])), value || "ALL", onChange);
+    return select("Cluster", [["ALL", "All clusters"]].concat(Dim.x.clusters.map(c => [c, c])), value || "ALL", onChange);
   }
 
   /** Multi-select unit (chip). selected kosong = semua. */
   function unitPicker(units, selected, onChange, labelFn = u => u) {
     let sel = new Set(selected && selected.length ? selected : units);
-    const el = node(`<div class="chips" role="group" aria-label="${t("Units")}"></div>`);
+    const el = node(`<div class="chips" role="group" aria-label="Units"></div>`);
     const draw = () => {
       const all = sel.size === units.length;
-      el.innerHTML = `<button type="button" class="chip" data-a="all" aria-pressed="${all}">${t("All")}</button>` +
+      el.innerHTML = `<button type="button" class="chip" data-a="all" aria-pressed="${all}">All</button>` +
         units.map(u => `<button type="button" class="chip" data-u="${esc(u)}" aria-pressed="${!all && sel.has(u)}" title="${esc(Dim.unitName(u) || u)}">${esc(labelFn(u))}</button>`).join("");
     };
     el.addEventListener("click", e => {
@@ -93,7 +93,7 @@ const UI = (() => {
   function table(cols, opts = {}) {
     const st = { rows: opts.rows || [], topN: opts.topN === undefined ? null : opts.topN,
       sort: opts.sort || null, maxRender: opts.maxRender || 1000 };
-    const el = node(`<div class="tbl-box"><div class="tbl-foot" data-top></div><div class="tbl-wrap"${opts.full ? ' style="max-height:none"' : ""}><table class="tbl"><thead></thead><tbody></tbody></table></div><div class="tbl-foot" data-bot></div></div>`);
+    const el = node(`<div class="tbl-box"><div class="tbl-foot" data-top></div><div class="tbl-wrap"><table class="tbl"><thead></thead><tbody></tbody></table></div><div class="tbl-foot" data-bot></div></div>`);
     const val = (c, r) => c.get ? c.get(r) : r[c.key];
     const isNumT = t => t === "money" || t === "pct" || t === "int" || t === "num";
     const cell = (c, r) => {
@@ -103,7 +103,7 @@ const UI = (() => {
         case "money": return isNum(v) ? `<span class="num" data-raw="${Math.round(v)}" title="${fmtInt(v)}">${fmt(v)}</span>` : DASH;
         case "pct": return `<span class="num">${fmtPct(v)}</span>`;
         case "int": return `<span class="num">${fmtInt(v)}</span>`;
-        case "num": return `<span class="num">${fmtNum(v)}</span>`;
+        case "num": return `<span class="num">${isNum(v) ? Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }) : DASH}</span>`;
         case "date": return esc(dateLabel(dstr(v)));
         default: return esc(v ?? "");
       }
@@ -119,44 +119,35 @@ const UI = (() => {
       });
     };
     const shownRows = all => st.topN ? all.slice(0, st.topN) : all;
-    const matchQ = r => { if (!st.q) return true; const q = st.q.toLowerCase();
-      return cols.some(c => (!c.type || c.type === "text") && String((c.get ? c.get(r) : r[c.key]) ?? "").toLowerCase().includes(q)); };
     const totalRow = () => {
-      const tot = opts.total; if (!tot) return null;
-      if (typeof tot === "function") return tot(st.rows);
-      if (tot === true) { const o = {}; cols.forEach((c, i) => {
-        if (i === 0) o[c.key] = t("Total");
+      const t = opts.total; if (!t) return null;
+      if (typeof t === "function") return t(st.rows);
+      if (t === true) { const o = {}; cols.forEach((c, i) => {
+        if (i === 0) o[c.key] = "Total";
         else if (c.type === "money" || c.type === "int") o[c.key] = st.rows.reduce((s, r) => s + (Number(val(c, r)) || 0), 0); });
         o.__total = true; return o; }
-      return tot;
+      return t;
     };
     function draw() {
-      const all = sorted().filter(matchQ), shown = shownRows(all), render = shown.slice(0, st.maxRender), tot = totalRow(); st.shown = render;
-      const vis = cols.filter(c => !c.hidden);
-      el.querySelector("thead").innerHTML = "<tr>" + vis.map(c => {
+      const all = sorted(), shown = shownRows(all), render = shown.slice(0, st.maxRender), tot = totalRow();
+      el.querySelector("thead").innerHTML = "<tr>" + cols.map(c => {
         const s = c.sortable !== false, on = st.sort && st.sort.key === c.key;
         return `<th class="${isNumT(c.type) || c.align === "r" ? "r" : ""} ${s ? "sortable" : ""}" data-k="${esc(c.key)}" ${on ? `aria-sort="${st.sort.dir === "asc" ? "ascending" : "descending"}"` : ""}>${esc(c.label)}${on ? `<span class="arr">${st.sort.dir === "asc" ? "▲" : "▼"}</span>` : ""}</th>`;
       }).join("") + "</tr>";
-      const tr = (r, cls = "", i) => `<tr class="${cls}${opts.onRow && !cls ? " link-row" : ""}"${i != null ? ` data-i="${i}"` : ""}>` + vis.map(c => `<td class="${isNumT(c.type) || c.align === "r" ? "r" : ""}">${cls ? totCell(c, r) : cell(c, r)}</td>`).join("") + "</tr>";
-      const totCell = (c, r) => { const v = r[c.key]; if (v === undefined || v === null || v === "") return "";
-        return c.type && c.type !== "text" && c.type !== "date" ? cell({ ...c, render: null, get: null }, r) : esc(v); };
+      const tr = (r, cls = "") => `<tr class="${cls}">` + cols.map(c => `<td class="${isNumT(c.type) || c.align === "r" ? "r" : ""}">${(cls && c.key === cols[0].key) ? esc(r[c.key]) : (cls && r[c.key] === undefined ? "" : cell(c, r))}</td>`).join("") + "</tr>";
       el.querySelector("tbody").innerHTML = render.length
-        ? render.map((r, i) => tr(r, "", i)).join("") + (tot ? tr(tot, "total") : "")
-        : `<tr><td colspan="${vis.length}">${empty(opts.emptyText || t("No data for the selected filters."))}</td></tr>`;
+        ? render.map(r => tr(r)).join("") + (tot ? tr(tot, "total") : "")
+        : `<tr><td colspan="${cols.length}">${empty(opts.emptyText || "No data for the selected filters.")}</td></tr>`;
       const capped = shown.length > render.length;
       const top = el.querySelector("[data-top]");
-      top.innerHTML = `<span>${all.length ? t("Showing {a} of {b}", { a: fmtInt(render.length), b: fmtInt(all.length) }) + (capped ? " " + t("(use Copy for the full list)") : "") : ""}</span><span class="card-tools"></span>`;
+      top.innerHTML = `<span>${all.length ? `Showing ${fmtInt(render.length)} of ${fmtInt(all.length)}${capped ? " (use Copy for the full list)" : ""}` : ""}</span><span class="card-tools"></span>`;
       const tools = top.querySelector(".card-tools");
-      if (opts.search) { const q = node(`<input type="search" class="tbl-q" placeholder="${esc(t("Search"))}" aria-label="${esc(t("Search"))}" value="${esc(st.q || "")}">`);
-        let tm = null; q.addEventListener("input", e => { clearTimeout(tm); tm = setTimeout(() => { st.q = e.target.value.trim(); draw();
-          const i = el.querySelector(".tbl-q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 200); });
-        tools.appendChild(q); }
-      if (st.topN !== null) tools.appendChild(seg([[10, "Top 10"], [20, "Top 20"], [50, "Top 50"], [0, t("All")]], st.topN, v => { st.topN = +v; draw(); }, t("Rows shown")));
+      if (st.topN !== null) tools.appendChild(seg([[10, "Top 10"], [20, "Top 20"], [50, "Top 50"], [0, "All"]], st.topN, v => { st.topN = +v; draw(); }, "Rows shown"));
       if (opts.copy !== false) {
-        const b = node(`<button type="button" class="btn" title="${t("Copy as tab-separated text, ready to paste into Excel")}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>${shown.length === all.length ? t("Copy all") : t("Copy {n}", { n: fmtInt(shown.length) })}</button>`);
+        const b = node(`<button type="button" class="btn" title="Copy as tab-separated text, ready to paste into Excel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy ${shown.length === all.length ? "all" : fmtInt(shown.length)}</button>`);
         b.onclick = () => {
           const rows = shown.concat(tot ? [tot] : []);
-          copyText(toTSV(cols.filter(c => c.copy !== false), rows)).then(() => toast(t("Copied {n} rows — paste into Excel", { n: fmtInt(shown.length) })));
+          copyText(toTSV(cols.filter(c => c.copy !== false), rows)).then(() => toast(`Copied ${fmtInt(shown.length)} rows — paste into Excel`));
         };
         tools.appendChild(b);
       }
@@ -167,10 +158,6 @@ const UI = (() => {
       const k = th.dataset.k, c = cols.find(x => x.key === k);
       st.sort = st.sort && st.sort.key === k ? { key: k, dir: st.sort.dir === "asc" ? "desc" : "asc" } : { key: k, dir: isNumT(c.type) ? "desc" : "asc" };
       draw();
-    });
-    if (opts.onRow) el.querySelector("tbody").addEventListener("click", e => {
-      if (e.target.closest(".num[data-raw]") || e.target.closest("a,button")) return;
-      const tr = e.target.closest("tr[data-i]"); if (tr) opts.onRow(st.shown[+tr.dataset.i]);
     });
     el.update = rows => { st.rows = rows || []; draw(); };
     draw();
@@ -185,7 +172,7 @@ const UI = (() => {
   /* klik angka uang -> salin integer bersih (perilaku FMD lama) */
   document.addEventListener("click", e => {
     const n = e.target.closest(".num[data-raw]"); if (!n) return;
-    copyText(n.dataset.raw).then(() => toast(t("Copied: {v}", { v: fmtInt(+n.dataset.raw) })));
+    copyText(n.dataset.raw).then(() => toast("Copied: " + Number(n.dataset.raw).toLocaleString("en-US")));
   });
 
   return { node, toast, kpi, card, tag, empty, banner, skeleton, seg, select, clusterSelect, unitPicker, table, unitBadge };
