@@ -1,6 +1,13 @@
 /* Terjemahan ID. Kunci = teks English persis seperti di kode ({var} wajib dipertahankan). */
 "use strict";
 const I18N_ID = {
+  "excl. {n} items with a likely unit mismatch": "tanpa {n} item yang kemungkinan beda satuan",
+  "check unit": "cek satuan",
+  "Highest price is 3× or more the lowest: probably a different unit of measure (kg vs pack). Not counted in the total.": "Harga tertinggi 3× atau lebih dari terendah: kemungkinan beda satuan (kg vs pak). Tidak dihitung di total.",
+  "all lines incl. LPG and CK": "semua baris termasuk LPG dan CK",
+  "Units: {u}": "Unit: {u}",
+  "This account only sees data for these units. All totals and rankings cover these units only.": "Akun ini hanya melihat data unit berikut. Semua total dan peringkat hanya mencakup unit ini.",
+  "Your account has no unit access yet. Ask Finance to fill Allowed_Units.": "Akun Anda belum diberi akses unit. Minta Finance mengisi Allowed_Units.",
   "Avg price": "Harga rata-rata",
   "Largest unit": "Unit terbesar",
   "Qty is in each item’s own unit (kg, pcs, btl…) and is not added across items.": "Qty memakai satuan masing-masing item (kg, pcs, btl…) dan tidak dijumlah antar-item.",
@@ -228,7 +235,7 @@ const I18N_ID = {
   "Consumption only (own store + transfers in, including CK FG) against F&B revenue · target {g}. Units without their own store show transfers in only; combined DML + SR ratios are on the Summary page.": "Konsumsi saja (store sendiri + transfer masuk, termasuk FG CK) terhadap pendapatan F&B · target {g}. Unit tanpa store hanya menampilkan transfer masuk; rasio gabungan DML + SR ada di halaman Summary.",
   "All requisition and transfer lines matching the filters above, newest first. Quantities are not totalled because units of measure differ.": "Semua baris permintaan dan transfer sesuai filter, terbaru di atas. Qty tidak dijumlah karena satuannya berbeda.",
   "Finished goods produced by the Central Kitchen (CK team input), valued at internal price. The unit filter does not apply to this view.": "Barang jadi yang diproduksi Central Kitchen (input tim CK), dinilai dengan harga internal. Filter unit tidak berlaku di tampilan ini.",
-  "COGS percentages use each unit’s own category revenue: Food items ÷ Food revenue (incl. events), Beverage items ÷ Beverage revenue. Store requisitions follow the Food/Beverage category on each line; direct purchases follow the requesting department (Bar = Beverage). PLCS and PKJ are compared as one cost group. Units without cost data are not shown.": "Persentase COGS memakai pendapatan kategori tiap unit: item Food ÷ pendapatan Food (termasuk event), item Beverage ÷ pendapatan Beverage. Permintaan store mengikuti kategori Food/Beverage di tiap baris; belanja langsung mengikuti departemen peminta (Bar = Beverage). PLCS dan PKJ dibandingkan sebagai satu cost group. Unit tanpa data biaya tidak ditampilkan.",
+  "COGS percentages use each unit’s own category revenue: Food items ÷ Food revenue (incl. events), Beverage items ÷ Beverage revenue. Store requisitions follow the Food/Beverage category on each line; direct purchases follow the requesting department (Bar = Beverage). PLCS and PKJ are compared as one cost group. Units without cost data are not shown. LPG is excluded, as in the Cost Summary.": "Persentase COGS memakai pendapatan kategori tiap unit: item Food ÷ pendapatan Food (termasuk event), item Beverage ÷ pendapatan Beverage. Permintaan store mengikuti kategori Food/Beverage di tiap baris; belanja langsung mengikuti departemen peminta (Bar = Beverage). PLCS dan PKJ dibandingkan sebagai satu cost group. Unit tanpa data biaya tidak ditampilkan. LPG tidak dihitung, sama seperti Ringkasan Biaya.",
   "Non-COGS supplies issued from store, classified by the expense COA on each line (7xxx). Percentages use each unit’s total revenue. Direct purchases contain only food and beverage, so supplies come from store issues alone. Pre-opening and balance-sheet postings are excluded (see Data › Status).": "Supplies non-COGS yang keluar dari store, diklasifikasikan menurut COA beban di tiap baris (7xxx). Persentase memakai total pendapatan unit. Belanja langsung hanya berisi food dan beverage, jadi supplies hanya dari pengeluaran store. Pra-pembukaan dan neraca tidak dihitung (lihat Data › Status).",
   "of F&B revenue, all selected units": "dari pendapatan F&B, semua unit terpilih",
   "of total revenue, all selected units": "dari total pendapatan, semua unit terpilih",

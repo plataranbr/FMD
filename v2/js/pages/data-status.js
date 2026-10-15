@@ -58,7 +58,7 @@ FMD.page("data/status", {
     add("crit", t("Balance-sheet COA issued through store"), C.filter(r => coaClass(r) === "BS"), t("Excluded from cost ratios; should be reclassified or posted to the balance sheet."));
     add("warn", t("Pre-opening COA"), C.filter(r => coaClass(r) === "PRE"), t("Excluded from cost ratios (pre-opening cost)."));
     add("warn", t("COA not yet assigned"), C.filter(r => String(r.Flag_Status || "").toUpperCase() === "COA_PENDING"), t("Lines waiting for a COA in the store working paper."));
-    add("info", t("Charged to units not monitored"), C.filter(r => r.Unit_Beban && !Dim.monitored(r.Unit_Beban)), t("Codes not in DIM_UNIT (e.g. PW, PBR) are outside the dashboard."));
+    if (!scoped()) add("info", t("Charged to units not monitored"), C.filter(r => r.Unit_Beban && !Dim.monitored(r.Unit_Beban)), t("Codes not in DIM_UNIT (e.g. PW, PBR) are outside the dashboard."));
     add("warn", t("Lines without a charge-to unit"), C.filter(r => !r.Unit_Beban), t("Unit_Beban empty and no storage keyword matched."));
     const noCost = units.filter(U => !COST_CENTER_ONLY.has(U.unit) && !U.since).map(U => U.unit);
     const aliasOf = {}; Object.entries(x.alias).forEach(([a, u]) => (aliasOf[u] = aliasOf[u] || []).push(a));

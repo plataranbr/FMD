@@ -49,7 +49,7 @@ const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(
 
 /* ---------- Sesi (sessionStorage: hilang saat tab ditutup) ---------- */
 function saveSession(r) {
-  const s = { token: r.token, name: r.nama, role: r.role, email: r.email || "", allowed: r.allowed,
+  const s = { token: r.token, name: r.nama, role: r.role, email: r.email || "", allowed: r.allowed, units: r.units == null ? "ALL" : r.units,
     exp: Date.now() + (r.ttl || 21600) * 1000 - 5 * 60 * 1000 };
   Store.set("sessionStorage", CFG.SESSION_KEY, JSON.stringify(s)); setState(s);
 }
@@ -58,10 +58,10 @@ function loadSession() {
     if (s && s.token && s.exp > Date.now()) { setState(s); return true; } } catch (e) {}
   Store.del("sessionStorage", CFG.SESSION_KEY); return false;
 }
-function setState(s) { Object.assign(STATE, { token: s.token, name: s.name, role: s.role, email: s.email, allowed: s.allowed }); }
+function setState(s) { Object.assign(STATE, { token: s.token, name: s.name, role: s.role, email: s.email, allowed: s.allowed, units: s.units == null ? "ALL" : s.units }); }
 function clearSession() {
   Store.del("sessionStorage", CFG.SESSION_KEY);
-  Object.assign(STATE, { token: null, name: "", role: "", email: "", allowed: null, data: {}, ver: {}, lastActualDate: "" });
+  Object.assign(STATE, { token: null, name: "", role: "", email: "", allowed: null, units: "ALL", data: {}, ver: {}, lastActualDate: "" });
   memoClear(); Dim.reset();
 }
 
@@ -129,7 +129,10 @@ function renderNav() {
   $("nav").innerHTML = groups.map(g => `<div class="nav-group"><h4>${esc(t(g.name))}</h4>${g.items.map(p =>
     `<a class="nav-item${p.render ? "" : " soon"}" href="#/${p.id}" data-id="${p.id}"${p.render ? "" : ` title="${esc(t("Not yet migrated — opens a link to the classic dashboard"))}"`}>${esc(t(p.label))}</a>`).join("")}</div>`).join("");
   $("userName").textContent = STATE.name || "—";
-  $("userSub").textContent = STATE.email || STATE.role || "";
+  $("userSub").textContent = (STATE.email || STATE.role || "") + (scoped() ? " · " + t("Units: {u}", { u: STATE.units.join(", ") || DASH }) : "");
+  const sc = $("scope");
+  if (sc) { sc.classList.toggle("hidden", !scoped());
+    if (scoped()) { sc.textContent = t("Units: {u}", { u: STATE.units.join(", ") || DASH }); sc.title = t("This account only sees data for these units. All totals and rankings cover these units only."); } }
   $("avatar").textContent = (STATE.name || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 function markNav(id) { document.querySelectorAll(".nav-item").forEach(a => a.dataset.id === id ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")); }
@@ -151,6 +154,7 @@ async function route() {
   document.title = t(p.label) + " · FMD";
   const host = $("view"); host.innerHTML = ""; window.scrollTo(0, 0);
   if (!p.need.every(allowedTab)) { host.innerHTML = UI.card({ body: UI.empty(t("Your account does not have access to this page. Contact Finance if you need it.")) }); return; }
+  if (scoped() && !STATE.units.length) { host.innerHTML = UI.card({ body: UI.banner(t("Your account has no unit access yet. Ask Finance to fill Allowed_Units."), "warn") }); return; }
   if (!p.render) { host.innerHTML = placeholder(p); return; }
   try {
     const cleanup = await p.render(host, { isStale: () => seq !== FMD._seq });

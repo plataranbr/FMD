@@ -62,7 +62,7 @@ FMD.page("cost/dml", {
         ${loadErr ? UI.banner(t("Purchase lines could not be loaded: {e}", { e: loadErr }), "crit") : ""}
         ${noAmt ? UI.banner(t("{n} purchase lines have no amount yet (price not filled in); they count as zero.", { n: fmtInt(noAmt) }), "warn") : ""}
         <section class="grid g4">
-          ${UI.kpi({ label: t("Direct Purchases"), value: have ? fmtRp(totAmt) : DASH, showRing: false, note: have ? t("{n} lines · {i} items", { n: fmtInt(base.length), i: fmtInt(new Set(base.map(r => r.Nama_Item)).size) }) : t("Loading…") })}
+          ${UI.kpi({ label: t("Direct Purchases"), value: have ? fmtRp(totAmt) : DASH, showRing: false, note: have ? t("{n} lines · {i} items", { n: fmtInt(base.length), i: fmtInt(new Set(base.map(r => r.Nama_Item)).size) }) + " · " + t("all lines incl. LPG and CK") : t("Loading…") })}
           ${UI.kpi({ label: t("DML Cost Ratio"), value: T.pct == null ? DASH : fmtPct(T.pct, 1), showRing: false, note: T.pct == null ? "" : t("{x} vs {g} target · excl. CK", { x: fmtPts(T.pct - T.tgt), g: fmtPct(T.tgt, 0) }), noteKind: T.pct == null ? "" : T.pct > T.tgt ? "crit" : T.pct > T.tgt * 0.9 ? "warn" : "ok" })}
           ${UI.kpi({ label: t("Price Spikes"), value: have ? fmtInt(spikes.length) : DASH, showRing: false, note: have && spikes.length ? t("{a} of purchase value", { a: fmtRp(spAmt) }) : t("Lines flagged above recent price"), noteKind: spikes.length ? "warn" : "" })}
           ${UI.kpi({ label: t("Suppliers"), value: have ? fmtInt(Object.keys(supAmt).length) : DASH, showRing: false, note: topSup && totAmt > 0 ? t("Largest: {s} ({p})", { s: topSup[0], p: fmtPct(topSup[1] / totAmt, 0) }) : "" })}

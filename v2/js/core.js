@@ -10,7 +10,7 @@ const CFG = {
   THEME_KEY: "fmd.v2.theme",
 };
 
-const STATE = { token: null, name: "", role: "", email: "", allowed: null, data: {}, ver: {}, lastActualDate: "" };
+const STATE = { token: null, name: "", role: "", email: "", allowed: null, units: "ALL", data: {}, ver: {}, lastActualDate: "" };
 
 /* ---------- storage aman (private mode / blocked storage tidak boleh mematikan app) ---------- */
 const Store = {
@@ -36,6 +36,8 @@ async function api(payload) {
   }
   return r;
 }
+/** Unit yang boleh dilihat akun ini; filter sesungguhnya di server (UnitScope.gs). */
+const scoped = () => STATE.units !== "ALL" && Array.isArray(STATE.units);
 function allowedTab(tab) { return STATE.allowed === "ALL" || (Array.isArray(STATE.allowed) && STATE.allowed.includes(tab)); }
 
 /* ---------- IndexedDB cache (sama dengan FMD live) ---------- */

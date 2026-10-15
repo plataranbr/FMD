@@ -1,5 +1,6 @@
 /* Cost of Sales › Purchasing — dispersi harga per item master (Mapping_ID) antar supplier & unit, dari detail DML. */
 "use strict";
+const UOM_SUSPECT = 3;   // harga tertinggi ≥ 3× terendah: hampir pasti beda satuan (ikat vs kg) -> tidak dihitung di potensi hemat
 
 const PUR = { preset: "mtd", from: "", to: "", cluster: "ALL", unit: "ALL", sup: "ALL", cat: "ALL", minSpread: 0, pick: "" };
 
@@ -53,17 +54,17 @@ FMD.page("cost/purchasing", {
         if (gs.length < 2) return null;
         const lo = gs.reduce((a, b) => b.avg < a.avg ? b : a), hi = gs.reduce((a, b) => b.avg > a.avg ? b : a);
         const save = I.lines.reduce((s, r) => s + Math.max(0, r._p - lo.avg) * r.Qty, 0);
-        return { id: I.id, name: I.name, cat: I.cat, amt: I.amt, lo: lo.avg, loBy: lo.sup + " · " + lo.unit, hi: hi.avg, hiBy: hi.sup + " · " + hi.unit, spread: hi.avg / lo.avg - 1, save,
+        return { id: I.id, name: I.name, cat: I.cat, amt: I.amt, lo: lo.avg, loBy: lo.sup + " · " + lo.unit, hi: hi.avg, hiBy: hi.sup + " · " + hi.unit, spread: hi.avg / lo.avg - 1, save, uom: hi.avg / lo.avg >= UOM_SUSPECT,
           units: [...new Set(gs.map(g => g.unit))].join(", "), nSup: new Set(gs.map(g => g.sup)).size, gs, supHit: PUR.sup === "ALL" || gs.some(g => g.sup === PUR.sup) };
       }).filter(r => r && r.supHit && r.spread >= PUR.minSpread);
-      const totSave = rows.reduce((s, r) => s + r.save, 0), totAmt = lines.reduce((s, r) => s + (r._amt || 0), 0), wide = rows.filter(r => r.spread >= 0.2);
+      const nUom = rows.filter(r => r.uom).length, totSave = rows.reduce((s, r) => s + (r.uom ? 0 : r.save), 0), totAmt = lines.reduce((s, r) => s + (r._amt || 0), 0), wide = rows.filter(r => r.spread >= 0.2);
       host.querySelector("#puKpi").innerHTML = [
         UI.kpi({ label: t("Purchases Reviewed"), value: fmtRp(totAmt), showRing: false, note: t("{n} lines with price and quantity", { n: fmtInt(lines.length) }) }),
         UI.kpi({ label: t("Items With Price Variation"), value: fmtInt(rows.length), showRing: false, note: t("Bought at 2+ supplier/unit combinations") }),
         UI.kpi({ label: t("Spread ≥ 20%"), value: fmtInt(wide.length), showRing: false, note: t("Items with the widest price gap"), noteKind: wide.length ? "warn" : "" }),
-        UI.kpi({ label: t("Potential Saving"), value: fmtRp(totSave), showRing: false, note: totAmt > 0 ? t("{p} of purchases reviewed, at the lowest observed price", { p: fmtPct(totSave / totAmt, 1) }) : "" }),
+        UI.kpi({ label: t("Potential Saving"), value: fmtRp(totSave), showRing: false, note: (totAmt > 0 ? t("{p} of purchases reviewed, at the lowest observed price", { p: fmtPct(totSave / totAmt, 1) }) : "") + (nUom ? " · " + t("excl. {n} items with a likely unit mismatch", { n: fmtInt(nUom) }) : "") }),
       ].join("");
-      const topS = rows.slice().sort((a, b) => b.save - a.save).slice(0, 3);
+      const topS = rows.filter(r => !r.uom).sort((a, b) => b.save - a.save).slice(0, 3);
       host.querySelector("#puIns .card-b").innerHTML = topS.length ? `<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.55">` + topS.map(r =>
         `<li>${esc(t("{i} costs {p} more at {h} than at {l}; buying all of it at the lower price would have saved about {s} in this period.", { i: r.name, p: fmtPct(r.spread, 0), h: r.hiBy, l: r.loBy, s: fmtRp(r.save) }))}</li>`).join("") + `</ul>`
         : UI.empty(t("No items with price variation for the selected filters."));
@@ -71,8 +72,8 @@ FMD.page("cost/purchasing", {
         { key: "name", label: t("Item master"), render: r => `<b>${esc(r.name)}</b><div class="muted" style="font-size:11px">${esc(r.id)} · ${esc(r.cat)}</div>` },
         { key: "lo", label: t("Lowest avg. price"), type: "money", render: r => `<span class="num">${esc(fmtInt(r.lo))}</span><div class="muted" style="font-size:11px">${esc(r.loBy)}</div>` },
         { key: "hi", label: t("Highest avg. price"), type: "money", render: r => `<span class="num">${esc(fmtInt(r.hi))}</span><div class="muted" style="font-size:11px">${esc(r.hiBy)}</div>` },
-        { key: "spread", label: t("Spread"), type: "pct", render: r => UI.tag("+" + fmtPct(r.spread, 0), r.spread >= 0.5 ? "crit" : r.spread >= 0.2 ? "warn" : "mute") },
-        { key: "save", label: t("Potential saving"), type: "money" }, { key: "amt", label: t("Purchased"), type: "money" },
+        { key: "spread", label: t("Spread"), type: "pct", render: r => UI.tag("+" + fmtPct(r.spread, 0), r.spread >= 0.5 ? "crit" : r.spread >= 0.2 ? "warn" : "mute") + (r.uom ? `<div style="margin-top:4px">${UI.tag(t("check unit"), "info")}</div>` : "") },
+        { key: "save", label: t("Potential saving"), type: "money", render: r => r.uom ? `<span class="muted" title="${esc(t("Highest price is 3× or more the lowest: probably a different unit of measure (kg vs pack). Not counted in the total."))}">${esc(fmt(r.save))}*</span>` : `<span class="num">${esc(fmt(r.save))}</span>` }, { key: "amt", label: t("Purchased"), type: "money" },
         { key: "nSup", label: t("Suppliers"), type: "int" }, { key: "units", label: t("Units") },
         { key: "loBy", label: t("Lowest at"), hidden: true }, { key: "hiBy", label: t("Highest at"), hidden: true }, { key: "id", label: "Mapping_ID", hidden: true },
       ], { rows, topN: 20, sort: { key: "save", dir: "desc" }, search: true, onRow: r => { PUR.pick = PUR.pick === r.id ? "" : r.id; draw(); }, emptyText: t("No items with price variation for the selected filters.") });

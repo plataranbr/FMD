@@ -57,7 +57,7 @@ function crossPage(id, cls) {
             lines.push({ k: Cost.key(r.Unit_Beban), cat: sk === "RAW" ? (bev ? t("Store requisition · Beverage") : t("Store requisition · Food")) : t("CK {s}", { s: SK[sk] }), item: String(r.Description || "").trim().toUpperCase(),
               bev, amt: Number(r.Amount) || 0, qty: Number(r.Qty) || 0, src: "SR", who: r.Unit_Sumber || "", d: r._d }); });
           if (S.src !== "sr") { const ms = []; for (let m = R.from.slice(0, 7); m <= R.to.slice(0, 7); m = addMonths(m, 1)) ms.push(m);
-            if (ms.every(m => DmlDetail.byMonth && DmlDetail.byMonth[m])) DmlDetail.rows(ms).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !o.keys.has(r._k)) return;
+            if (ms.every(m => DmlDetail.byMonth && DmlDetail.byMonth[m])) DmlDetail.rows(ms).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !o.keys.has(r._k) || isGasLine(r)) return;   // tanpa LPG = basis Summary
               lines.push({ k: r._k, cat: String(r.Kategori || t("Uncategorised")), item: String(r.Nama_Item || "").trim().toUpperCase(), bev: r.Bucket === "BAR", amt: r._amt || 0, qty: r.Qty, src: "DML", who: String(r.Supplier || "").trim(), price: r._p, d: r._d }); }); }
         } else {
           Cost.consDetail(o, "SUP").forEach(r => lines.push({ k: Cost.key(r.Unit_Beban), cat: supCategory(r.Kategori), item: String(r.Description || "").trim().toUpperCase(), bev: false, sup: true,
@@ -88,7 +88,7 @@ function crossPage(id, cls) {
         const totDen = keys.reduce((s, k) => s + (S.cls === "SUP" ? rev[k].revAll : rev[k].revTot), 0);
         let hot = 0; list.forEach(p => p.vals.forEach((v, i) => { if (heat(p, i) === "crit") hot++; }));
         host.querySelector("#xBasis").innerHTML = `<span><b>${esc(t("Basis:"))}</b> ${esc(S.cls === "COGS"
-          ? t("COGS percentages use each unit’s own category revenue: Food items ÷ Food revenue (incl. events), Beverage items ÷ Beverage revenue. Store requisitions follow the Food/Beverage category on each line; direct purchases follow the requesting department (Bar = Beverage). PLCS and PKJ are compared as one cost group. Units without cost data are not shown.")
+          ? t("COGS percentages use each unit’s own category revenue: Food items ÷ Food revenue (incl. events), Beverage items ÷ Beverage revenue. Store requisitions follow the Food/Beverage category on each line; direct purchases follow the requesting department (Bar = Beverage). PLCS and PKJ are compared as one cost group. Units without cost data are not shown. LPG is excluded, as in the Cost Summary.")
           : t("Non-COGS supplies issued from store, classified by the expense COA on each line (7xxx). Percentages use each unit’s total revenue. Direct purchases contain only food and beverage, so supplies come from store issues alone. Pre-opening and balance-sheet postings are excluded (see Data › Status)."))}</span>`;
         const msgs = [];
         if (loading) msgs.push(UI.banner(t("Loading purchase lines…"), "info"));

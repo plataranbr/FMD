@@ -71,6 +71,7 @@ button{cursor:pointer}
 .top-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .pill-btn{background:var(--card);color:var(--ink);border:none;border-radius:16px;height:44px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;font-size:13px}
 .pill-btn:hover{color:var(--accent)}
+.fresh.scope{color:var(--text);font-weight:600}
 .fresh{font-size:12px;color:var(--muted);background:var(--card);border-radius:16px;height:44px;padding:0 14px;display:inline-flex;align-items:center;gap:8px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
 .menu-btn{display:none}
@@ -172,7 +173,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px}
   .menu-btn{display:inline-flex}
   .g3,.g2{grid-template-columns:minmax(0,1fr)}.span2{grid-column:auto}
 }
-@media (max-width:600px){.filters>.field,.card-tools>.field{flex:1 1 100%}.field select{width:100%}.alert{flex-wrap:wrap;gap:8px 12px}.alert>div{flex:1 1 100%!important;order:2}.alert-link{order:3}.g4{grid-template-columns:minmax(0,1fr)}.topbar h1{font-size:20px}.card{padding:16px;border-radius:22px}.fresh{display:none}}
+@media (max-width:600px){.filters>.field,.card-tools>.field{flex:1 1 100%}.field select{width:100%}.alert{flex-wrap:wrap;gap:8px 12px}.alert>div{flex:1 1 100%!important;order:2}.alert-link{order:3}.g4{grid-template-columns:minmax(0,1fr)}.topbar h1{font-size:20px}.card{padding:16px;border-radius:22px}.fresh:not(.scope){display:none}.fresh.scope{height:36px;padding:0 10px}}
 /* Cost of Sales */
 .pill{display:inline-block;border-radius:8px;padding:2px 8px;font-weight:600;font-size:12.5px}
 .pill.b-crit{color:var(--crit);background:var(--crit-bg)}.pill.b-warn,.pill.b-caution{color:var(--warn);background:var(--warn-bg)}.pill.b-ok{color:var(--ok);background:var(--ok-bg)}

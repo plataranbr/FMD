@@ -218,6 +218,9 @@ function subKategoriOf(r) {
   if (/^111[789]/.test(a)) return "FG_KITCHEN"; if (/^112[01]/.test(a)) return "FG_BAKERY"; return "RAW";
 }
 /** baris Consumption_Master detail (wajib tab Consumption_Master termuat) sesuai filter cost; opt.cls = Set kelas COA */
+/** baris DML berupa LPG — sama dengan isi DML_Gas_Daily (diuji: Sep 2026 Rp 217 Mio identik) */
+const GAS_RE = /\bGAS\b|LPG|ELPIJI/i;
+const isGasLine = r => GAS_RE.test(String(r.Nama_Item || ""));
 Cost.consDetail = function (o, cls = "FB") {
   return memo("cost|cdet|" + this.sig(o) + "|" + cls, () => {
     const M = STATE.data.Consumption_Master || [];
