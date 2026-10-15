@@ -9,7 +9,7 @@ const COST_SETS = {
   full: COST_TABS,
 };
 const COST_BASE_TABS = ["Revenue_Master", "Forecast_Output", "DIM_UNIT", "DIM_TANGGAL"];
-const STORE_UNITS = ["PLD", "PLS", "PLMT", "CK", "TSMB"];          // unit ber-store (sumber SR/transfer)
+const STORE_UNITS = ["PLD", "PLS", "PLMT", "CK", "TSMB", "PLSMM"];          // unit ber-store (sumber SR/transfer)
 const FG_CK_PREFIX = ["1117", "1118", "1119", "1120", "1121"];       // = FG_Master template CK
 const COST_TGT = { SUM: { F: 0.29, B: 0.29 }, DML: { F: 0.14, B: 0.14 }, SRT: { F: 0.15, B: 0.15 } };
 const LEAD_TIME_MIN = 4;                                             // hari; periode lebih pendek -> rasio bias naik
