@@ -1618,7 +1618,7 @@ function resizeRevenueCharts(){ // Chart.js bisa gepeng kalau sempat ter-hidden 
   (STATE.charts.sm||[]).forEach(c=>{try{c.resize();}catch(e){}});
 }
 const LEAD_TIME_MIN=4; // rentang < ini -> warning bias lead-time belanja
-const STORE_UNITS=["PLD","PLS","PLMT","CK","TSMB"];
+const STORE_UNITS=["PLD","PLS","PLMT","CK","TSMB","PLSMM"];
 // kode unit sumber cost != kode Revenue_Master (tanpa prefix T) -> normalkan ke kode revenue
 const UNIT_ALIAS_FALLBACK={BXC:"TBXC",SMS:"TSMS",SMB:"TSMB",PIM:"TPIM"};
 let DIMX=null; // cache turunan DIM_UNIT; di-reset tiap DIM_UNIT dimuat ulang
