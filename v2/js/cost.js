@@ -273,7 +273,7 @@ function costPeriodControls(host, st, redraw, opts = {}) {
 }
 
 /* ---------- nama kategori beban: buang prefix departemen (TIGADARI/POMEC/S&M/HRD), satukan nama terpotong ---------- */
-const SUP_PREFIX = /^(TIGADARI|POMEC|S&M|HRD)\s+/i;
+const SUP_PREFIX = /^(TIGADARI|POMEC|S&M)\s+/i;   // HRD sengaja tetap terpisah (keputusan Ans 15 Okt)
 function supCategory(name) {
   const all = memo("cost|supcanon", () => {
     const base = new Set((STATE.data.Consumption_Master || []).filter(r => coaClass(r) === "SUP").map(r => String(r.Kategori || "").replace(/\s+/g, " ").trim().toUpperCase().replace(SUP_PREFIX, "")).filter(Boolean));

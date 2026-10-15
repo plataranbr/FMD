@@ -84,37 +84,62 @@ function msBrief(D) {
   return out.join(" ");
 }
 
-/* ---------- lifecycle 3 bulan ---------- */
+/* ---------- lifecycle: status dari 3 bulan LENGKAP; bulan berjalan hanya ditampilkan (MTD aktual) ----------
+   Data SALES ITEM hanya berisi item yang terjual -> "tidak terjual" = tidak ada baris. */
 function msLifecycle() {
-  const ms = Menu.months.filter(m => m <= MSU.to).slice(-3); if (!ms.length) return { ms, rows: [], badU: [], noLatest: [] };
-  const latest = ms[ms.length - 1], last = Menu.dailyLast(), UL = msUnitLast();
-  const open = !!last && last.slice(0, 7) === latest && last < monthEnd(latest);
-  const daysIn = Rev.daysInMonth(latest), fallback = (STATE.lastActualDate || last || "").slice(0, 7) === latest ? +(STATE.lastActualDate || last).slice(8, 10) : daysIn;
-  const factorOf = u => { if (!open) return 1; const d = UL[u] && UL[u].slice(0, 7) === latest ? +UL[u].slice(8, 10) : fallback; return d > 0 ? daysIn / d : 1; };
+  const last = Menu.dailyLast(), cur = last ? last.slice(0, 7) : "";
+  const curOpen = !!last && last < monthEnd(cur);
+  const upto = Menu.months.filter(m => m <= MSU.to);
+  const mtdM = curOpen && upto[upto.length - 1] === cur ? cur : "";
+  const ms = upto.filter(m => m !== mtdM).slice(-3);
+  if (!ms.length) return { ms, rows: [], badU: [], noLatest: [], mtdM };
+  const latest = ms[ms.length - 1];
   const badU = new Set(sel0().filter(u => ms.some(m => Menu.isBad(u, m))));
   const has = new Set(Menu.items.filter(r => r.m === latest).map(r => r.u));          // unit tanpa data bulan terakhir: jangan dianggap "turun"
   const noLatest = sel0().filter(u => !has.has(u));
-  const rows = msRankable(msItems({ from: ms[0], to: latest, noListing: true, keepBad: true })).filter(r => has.has(r.u) && (!MSU.exclBad || !badU.has(r.u)));
+  const rows = msRankable(msItems({ from: ms[0], to: mtdM || latest, noListing: true, keepBad: true })).filter(r => has.has(r.u) && (!MSU.exclBad || !badU.has(r.u)));
   const first = {}; const { sel } = msScopeUnits(), U = new Set(sel);
   Menu.items.forEach(r => { if (!U.has(r.u)) return; const k = itemKey(r); if (!first[k] || r.m < first[k]) first[k] = r.m; });
   const o = {};
-  rows.forEach(r => { const k = itemKey(r), a = o[k] || (o[k] = { key: k, u: r.u, unit: menuUnitLabel(r.u), name: itemName(r), cat: r.c, per: {}, lt: {}, inLatest: false });
-    a.per[r.m] = (a.per[r.m] || 0) + r.sold; a.lt[r.m] = r.lt; if (r.m === latest) a.inLatest = true; });
-  const L = { rise: t("Rising"), dec: t("Declining"), dead: t("Inactive on menu"), ghost: t("Delisted, still selling"), fresh: t("New"), stable: t("Stable") };
+  // item yg ganti nama/PLU di POS (mis. PLD recode Okt) jangan dianggap "berhenti": cek juga PLU & nama ternormalisasi
+  const nn = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, ""), soldBy = {};
+  rows.forEach(r => { if (r.sold <= 0) return; const x = (soldBy[r.m] = soldBy[r.m] || new Set()); x.add(r.u + "#" + r.art); x.add(r.u + "@" + nn(r.menu)); });
+  rows.forEach(r => { const k = itemKey(r), a = o[k] || (o[k] = { key: k, u: r.u, unit: menuUnitLabel(r.u), name: itemName(r), cat: r.c, per: {}, lt: "", ids: new Set() });
+    a.per[r.m] = (a.per[r.m] || 0) + r.sold; a.ids.add(r.u + "#" + r.art); a.ids.add(r.u + "@" + nn(r.menu)); if (r.m !== mtdM || !a.lt) a.lt = r.lt || a.lt; });
+  const aliveIn = (a, m) => !!soldBy[m] && [...a.ids].some(id => soldBy[m].has(id));
+  const L = { rise: t("Rising"), dec: t("Declining"), dead: t("Stopped selling"), ghost: t("Delisted, still selling"), fresh: t("New"), stable: t("Stable") };
   const list = Object.values(o).map(a => {
-    const f = factorOf(a.u), v = ms.map((m, i) => (a.per[m] || 0) * (i === ms.length - 1 ? f : 1)), base = v[0], lv = v[v.length - 1], prev = v.length > 1 ? v[v.length - 2] : null;
-    const lt = a.lt[latest] || "", chg = base >= MS_CFG.LIFE_BASE ? lv / base - 1 : null;
+    const v = ms.map(m => a.per[m] || 0), base = v[0], lv = v[v.length - 1], mtd = mtdM ? (a.per[mtdM] || 0) : null;
+    const chg = base >= MS_CFG.LIFE_BASE ? lv / base - 1 : null;
+    const sold = m => (a.per[m] || 0) > 0, n = ms.length;
     let st = "stable";
-    if (lt === "X" && (a.per[latest] || 0) > 0) st = "ghost";
-    else if (lt === "V" && a.inLatest && (a.per[latest] || 0) === 0 && (prev === null || prev === 0)) st = "dead";
-    else if (first[a.key] === latest) st = "fresh";
+    if (a.lt === "X" && (sold(latest) || (mtdM && mtd > 0))) st = "ghost";
+    else if (n >= 3 && sold(ms[0]) && !aliveIn(a, ms[1]) && !aliveIn(a, ms[2]) && !(mtdM && aliveIn(a, mtdM))) st = "dead";
+    else if (first[a.key] === latest || (mtdM && first[a.key] === mtdM)) st = "fresh";
     else if (chg != null && chg >= MS_CFG.LIFE_PCT) st = "rise";
     else if (chg != null && chg <= -MS_CFG.LIFE_PCT) st = "dec";
-    return { ...a, v, chg, st, stLabel: L[st], listing: lt === "V" ? t("On menu") : lt === "X" ? t("Delisted") : "—", m1: v[0], m2: v[1] ?? null, m3: v[2] ?? null };
+    return { ...a, ids: undefined, v, chg, st, stLabel: L[st], listing: a.lt === "V" ? t("On menu") : a.lt === "X" ? t("Delisted") : "—",
+      m1: v[0], m2: v[1] ?? null, m3: v[2] ?? null, mtd };
   });
-  return { ms, latest, open, rows: list, L, badU: MSU.exclBad ? [...badU] : [], noLatest };
+  return { ms, latest, mtdM, rows: list, L, badU: MSU.exclBad ? [...badU] : [], noLatest };
 }
 const spark = (v, color) => { const mx = Math.max(...v, 1); return `<svg width="84" height="24" viewBox="0 0 84 24" aria-hidden="true"><polyline points="${v.map((x, i) => (6 + i * (72 / Math.max(1, v.length - 1))).toFixed(1) + "," + (21 - x / mx * 17).toFixed(1)).join(" ")}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`; };
+
+/** treemap squarified: items {a: luas} terurut menurun -> {x,y,w,h} */
+function squarify(items, x, y, w, h) {
+  const out = [], rest = items.slice();
+  const worst = (row, side) => { const s = row.reduce((t, r) => t + r.a, 0), mx = Math.max(...row.map(r => r.a)), mn = Math.min(...row.map(r => r.a)); return Math.max(side * side * mx / (s * s), (s * s) / (side * side * mn)); };
+  while (rest.length) {
+    const side = Math.min(w, h); let row = [rest.shift()];
+    while (rest.length && worst(row.concat(rest[0]), side) <= worst(row, side)) row.push(rest.shift());
+    const s = row.reduce((t, r) => t + r.a, 0), thick = s / side;
+    let off = 0;
+    row.forEach(r => { const len = r.a / thick;
+      out.push(w >= h ? { ...r, x, y: y + off, w: thick, h: len } : { ...r, x: x + off, y, w: len, h: thick }); off += len; });
+    if (w >= h) { x += thick; w -= thick; } else { y += thick; h -= thick; }
+  }
+  return out;
+}
 
 FMD.page("revenue/menu", {
   async render(host, ctx) {
@@ -155,7 +180,7 @@ FMD.page("revenue/menu", {
           ${UI.kpi({ label: t("Menu Revenue"), value: fmtRp(totRev), showRing: false, note: range + " · " + tn(sel.length, "{n} unit", "{n} units") + (evRev ? " · " + t("events & packages {p}", { p: fmtPct(evRev / (totRev || 1), 0) }) : "") })}
           ${UI.kpi({ label: t("Items Sold"), value: fmtInt(totSold), showRing: false, note: t("Portions and covers") })}
           ${UI.kpi({ label: t("Active Items"), value: fmtInt(active), showRing: false, note: t("Sold at least once in the period") })}
-          ${UI.kpi({ label: t("Menu Health Issues"), value: fmtInt(issues), showRing: false, note: t("Inactive on menu + delisted still selling"), noteKind: issues ? "warn" : "" })}
+          ${UI.kpi({ label: t("Menu Health Issues"), value: fmtInt(issues), showRing: false, note: t("Stopped selling + delisted still selling") + (LC.latest ? " · " + t("through {m}", { m: monthName(LC.latest) }) : ""), noteKind: issues ? "warn" : "" })}
         </section>
         <section class="card"><div class="card-h"><div><h2>${esc(t("Daily Sales Timeline & Projection"))}</h2>
           <div class="sub">${D ? esc(t("{m} · all units complete through {c}, latest report {d} · by main group", { m: monthLabel(D.m, true), c: dateLabel(D.complete), d: dateLabel(D.latest) })) : ""}${D && MSU.cgrp && !Menu.dailyHasCat ? " · " + esc(t("category filter not applied (daily data has no category yet)")) : ""}</div></div>
@@ -166,16 +191,13 @@ FMD.page("revenue/menu", {
           <div class="grid g2"><div class="panel"><h3>${esc(t("Sales Brief · rule-based"))}</h3><p style="margin:0;font-size:13px;line-height:1.6">${esc(msBrief(D))}</p>
             <div class="muted" style="font-size:12px;margin-top:4px">${esc(t("Projection method: for each unit, days after its latest report use the average of the same weekday over its last {n} weeks (menu POS basis). Indicative only — the official revenue forecast is on Daily & Projection.", { n: MS_CFG.PROJ_WEEKS }))}</div></div>
             <div class="panel" id="msDay"></div></div></section>
-        <section class="card" id="msMx"><div class="card-h"><div><h2>${esc(t("Monthly Sales Matrix"))}</h2><div class="sub">${esc(range)}${LC.open && months.includes(LC.latest) ? " · " + esc(t("{m} is month to date", { m: monthName(LC.latest) })) : ""}</div></div><div class="card-tools" id="msMxT"></div></div><div class="card-b"></div></section>
-        <section class="grid g2">
-          <div class="card" id="msTB"><div class="card-h"><div><h2>${esc(t("Top / Bottom Sellers"))}</h2><div class="sub">${esc(range)}${MSU.inclEvent ? "" : " · " + esc(t("excluding events & packages"))}</div></div><div class="card-tools" id="msTBT"></div></div><div class="card-b"></div></div>
-          <div class="card"><div class="card-h"><div><h2>${esc(t("Popularity × Revenue Quadrant"))}</h2><div class="sub">${esc(t("X = units sold · Y = revenue · dashed lines = median · one dot per item"))}${MSU.inclEvent ? "" : " · " + esc(t("excluding events & packages"))}</div></div></div>
-            <div style="position:relative;height:300px"><canvas id="msQuad" role="img" aria-label="${esc(t("Menu item quadrant"))}"></canvas></div><div id="msQuadL" class="chart-legend"></div>
-            <div class="muted" style="font-size:12px">${esc(t("Revenue is used as a proxy; classic menu engineering uses contribution margin, which needs recipe cost not available in this data."))}</div></div>
-        </section>
-        <section class="card" id="msLC"><div class="card-h"><div><h2>${esc(t("Menu Lifecycle — Movers & Menu Health (3 months)"))}</h2><div class="sub">${esc(LC.ms.map(m => monthName(m)).join(" · "))}${LC.open ? " · " + esc(t("{m} projected to a full month from each unit’s latest report", { m: monthName(LC.latest) })) : ""}${MSU.inclEvent ? "" : " · " + esc(t("excluding events & packages"))}${LC.noLatest.length ? " · " + esc(t("excluded (no data for {m}): {l}", { m: monthName(LC.latest), l: LC.noLatest.map(menuUnitLabel).join(", ") })) : ""}${LC.badU.length ? " · " + esc(t("excluded (data issue): {l}", { l: LC.badU.map(menuUnitLabel).join(", ") })) : ""}</div></div></div>
+        <section class="card" id="msMx"><div class="card-h"><div><h2>${esc(t("Monthly Sales Matrix"))}</h2><div class="sub">${esc(range)}${LC.mtdM && months.includes(LC.mtdM) ? " · " + esc(t("{m} is month to date", { m: monthName(LC.mtdM) })) : ""}</div></div><div class="card-tools" id="msMxT"></div></div><div class="card-b"></div></section>
+        <section class="card" id="msTM"><div class="card-h"><div><h2>${esc(MSU.cgrp ? t("Categories in {g}", { g: cgLabel(MSU.cgrp === "__none" ? "" : MSU.cgrp) }) : t("Sales by Category"))}</h2><div class="sub">${esc(range)} · ${esc(rev ? t("tile size = revenue") : t("tile size = units sold"))}${MSU.inclEvent ? "" : " · " + esc(t("excluding events & packages"))}</div></div><div class="card-tools" id="msTMT"></div></div>
+          <div id="msTMbox" class="tm" role="group" aria-label="${esc(t("Category treemap"))}"></div><div id="msTML" class="chart-legend"></div><div id="msTMN" class="muted" style="font-size:12px"></div></section>
+        <section class="card" id="msTB"><div class="card-h"><div><h2>${esc(t("Top / Bottom Sellers"))}</h2><div class="sub">${esc(range)}${MSU.inclEvent ? "" : " · " + esc(t("excluding events & packages"))}</div></div><div class="card-tools" id="msTBT"></div></div><div class="card-b"></div></section>
+        <section class="card" id="msLC"><div class="card-h"><div><h2>${esc(t("Menu Lifecycle — Movers & Menu Health (3 months)"))}</h2><div class="sub">${esc(LC.ms.map(m => monthName(m)).join(" · "))}${LC.mtdM ? " · " + esc(t("status uses complete months; {m} to date shown for reference, not projected", { m: monthName(LC.mtdM) })) : ""}${MSU.inclEvent ? "" : " · " + esc(t("excluding events & packages"))}${LC.noLatest.length ? " · " + esc(t("excluded (no data for {m}): {l}", { m: monthName(LC.latest), l: LC.noLatest.map(menuUnitLabel).join(", ") })) : ""}${LC.badU.length ? " · " + esc(t("excluded (data issue): {l}", { l: LC.badU.map(menuUnitLabel).join(", ") })) : ""}</div></div></div>
           <div class="chips" id="msLCchips"></div><div class="card-b"></div>
-          <div class="muted" style="font-size:12px">${esc(t("Units sold. Rising/Declining: change of at least ±{p} from the first month, with a base of at least {b} sold · Inactive on menu: listed (V) with no sales for 2 months · Delisted, still selling: delisted (X) with sales in the latest month · New: first sold in the latest month.", { p: fmtPct(MS_CFG.LIFE_PCT, 0), b: MS_CFG.LIFE_BASE }))}</div></section>`;
+          <div class="muted" style="font-size:12px">${esc(t("Units sold. Rising/Declining: change of at least ±{p} from the first month, with a base of at least {b} sold · Stopped selling: sold in the first month, none in the next two (POS data lists sold items only) · Delisted, still selling: delisted (X) with sales in the latest month or month to date · New: first sold in the latest month or month to date.", { p: fmtPct(MS_CFG.LIFE_PCT, 0), b: MS_CFG.LIFE_BASE }))}</div></section>`;
 
       const ex = host.querySelector("#msExcl"); if (ex) ex.onchange = e => { MSU.exclBad = e.target.checked; draw(); };
       // ---- filter ----
@@ -223,7 +245,7 @@ FMD.page("revenue/menu", {
       host.querySelector("#msMxT").appendChild(UI.seg(Object.entries(LV), MSU.lvl, v => { MSU.lvl = v; draw(); }, t("Level")));
       const keyOf = r => ({ cluster: Menu.cluster[r.u] || "—", unit: menuUnitLabel(r.u), group: r.g, cg: cgLabel(r.cg), cat: r.c, item: menuUnitLabel(r.u) + " · " + itemName(r) })[MSU.lvl];
       const piv = {}; items.forEach(r => { const k = keyOf(r), p = piv[k] || (piv[k] = { k, total: 0 }); p[r.m] = (p[r.m] || 0) + V(r); p.total += V(r); });
-      const mxCols = [{ key: "k", label: LV[MSU.lvl] }].concat(months.map(m => ({ key: m, label: monthLabel(m) + (LC.open && m === LC.latest ? " *" : ""), type: rev ? "money" : "int" })), [{ key: "total", label: t("Total"), type: rev ? "money" : "int" }], [{ key: "share", label: t("Share"), type: "pct", get: r => r.total / (totAll || 1) }]);
+      const mxCols = [{ key: "k", label: LV[MSU.lvl] }].concat(months.map(m => ({ key: m, label: monthLabel(m) + (m === LC.mtdM ? " *" : ""), type: rev ? "money" : "int" })), [{ key: "total", label: t("Total"), type: rev ? "money" : "int" }], [{ key: "share", label: t("Share"), type: "pct", get: r => r.total / (totAll || 1) }]);
       const prow = Object.values(piv), totAll = prow.reduce((s, r) => s + r.total, 0);
       const mxTotal = rs => { const o = { k: t("Total"), total: 0 }; months.forEach(m => (o[m] = rs.reduce((s, r) => s + (r[m] || 0), 0))); o.total = rs.reduce((s, r) => s + r.total, 0); return o; };
       host.querySelector("#msMx .card-b").appendChild(UI.table(mxCols, { rows: prow, topN: MSU.lvl === "item" ? 50 : null, sort: { key: "total", dir: "desc" }, total: mxTotal, search: true }));
@@ -243,21 +265,29 @@ FMD.page("revenue/menu", {
         { key: "share", label: t("Share"), type: "pct", get: r => (rev ? r.rev / (totRev || 1) : r.sold / (totSold || 1)) },   // pangsa thd total termasuk event
       ], { rows: tbRows, topN: 10, sort: { key: rev ? "rev" : "sold", dir: MSU.tbDir === "top" ? "desc" : "asc" }, emptyText: t("No items for the selected filters.") }));
 
-      // ---- quadrant ----
-      const pts = agg.filter(a => a.sold > 0 && a.rev > 0);
-      if (pts.length && chartReady(host.querySelector("#msQuad"))) {
-        const c = chartColors(), mx = median(pts.map(p => p.sold)), my = median(pts.map(p => p.rev));
-        const Q = { star: t("Stars — popular, high revenue"), puzzle: t("Puzzles — high revenue, low volume"), plow: t("Plowhorses — popular, low revenue"), dog: t("Dogs — review for removal") };
-        const qOf = p => p.sold >= mx ? (p.rev >= my ? "star" : "plow") : (p.rev >= my ? "puzzle" : "dog");
-        const qc = { star: c.accent, puzzle: c.pink, plow: c.orange, dog: c.muted }, cnt = {}; pts.forEach(p => (cnt[qOf(p)] = (cnt[qOf(p)] || 0) + 1));
-        host.querySelector("#msQuadL").innerHTML = Object.keys(Q).map(k => `<span class="lg"><span class="dot" style="background:${qc[k]}"></span>${esc(Q[k])} (${fmtInt(cnt[k] || 0)})</span>`).join("");
-        charts.push(new Chart(host.querySelector("#msQuad"), { type: "scatter", data: { datasets: [{ data: pts.map(p => ({ x: p.sold, y: p.rev, p })), backgroundColor: pts.map(p => qc[qOf(p)] + "B3"), pointRadius: 4, pointHoverRadius: 6 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: x => `${x.raw.p.name} · ${x.raw.p.unit}: ${fmtInt(x.raw.x)} ${t("sold")} · ${fmtRp(x.raw.y)}` } } },
-            scales: { x: { type: "logarithmic", title: { display: true, text: t("Units sold (log scale)") }, grid: { color: c.line }, ticks: { callback: v => [1, 10, 100, 1000, 10000, 100000].includes(v) ? fmtInt(v) : "" } },
-              y: { type: "logarithmic", title: { display: true, text: t("Revenue (log scale)") }, grid: { color: c.line }, ticks: { callback: v => [1e5, 1e6, 1e7, 1e8, 1e9].includes(v) ? fmt(v, 0) : "" } } } },
-          plugins: [{ id: "med", afterDraw(ch) { const { ctx, chartArea: a, scales: { x, y } } = ch; ctx.save(); ctx.strokeStyle = c.orange; ctx.setLineDash([5, 4]);
-            const px = x.getPixelForValue(mx), py = y.getPixelForValue(my); ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.moveTo(a.left, py); ctx.lineTo(a.right, py); ctx.stroke(); ctx.restore(); } }] }));
-      } else host.querySelector("#msQuad").parentElement.innerHTML = UI.empty(t("No items for the selected filters."));
+      // ---- treemap kategori ----
+      const TMC = { FOOD: t("Food"), BEVERAGE: t("Beverage"), EVENT: t("Events & packages"), OTHER: t("Other") };
+      const fbOf = r => isEventItem(r) ? "EVENT" : (r.fb === "FOOD" || r.fb === "BEVERAGE") ? r.fb : "OTHER";
+      const lvlCat = !!MSU.cgrp, tmIn = msRankable(items), tm = {};
+      tmIn.forEach(r => { const k = lvlCat ? r.c : cgLabel(r.cg), x = tm[k] || (tm[k] = { k, cg: r.cg, v: 0, fb: {} }); x.v += V(r); x.fb[fbOf(r)] = (x.fb[fbOf(r)] || 0) + Math.abs(V(r)); });
+      const tmAll = Object.values(tm).map(x => ({ ...x, cls: Object.entries(x.fb).sort((a, b) => b[1] - a[1])[0][0] }));
+      const tmPos = tmAll.filter(x => x.v > 0).sort((a, b) => b.v - a.v), tmNeg = tmAll.filter(x => x.v < 0), tmTot = tmPos.reduce((s, x) => s + x.v, 0);
+      if (lvlCat) { const b = UI.node(`<button type="button" class="chip">← ${esc(t("All category groups"))}</button>`); b.onclick = () => { MSU.cgrp = ""; draw(); }; host.querySelector("#msTMT").appendChild(b); }
+      host.querySelector("#msTML").innerHTML = Object.keys(TMC).filter(k => tmPos.some(x => x.cls === k)).map(k => `<span class="lg"><span class="sw tm-${k.toLowerCase()}"></span>${esc(TMC[k])}</span>`).join("");
+      host.querySelector("#msTMN").textContent = (tmNeg.length ? t("Not shown (negative): {l}.", { l: tmNeg.map(x => `${x.k} ${fV(x.v)}`).join(", ") }) + " " : "") + (lvlCat ? "" : t("Select a tile to filter the page to that category group."));
+      const box = host.querySelector("#msTMbox");
+      const paint = () => {
+        const W = box.clientWidth, H = box.clientHeight; box.innerHTML = "";
+        if (!tmPos.length || W < 10) { box.innerHTML = UI.empty(t("No items for the selected filters.")); return; }
+        squarify(tmPos.map(x => ({ ...x, a: x.v / tmTot * W * H })), 0, 0, W, H).forEach(x => {
+          const lv = x.w < 56 ? 0 : x.h >= 60 ? 3 : x.h >= 42 ? 2 : x.h >= 26 ? 1 : 0;
+          const el = UI.node(`<button type="button" class="tm-tile tm-${x.cls.toLowerCase()}" style="left:${x.x}px;top:${x.y}px;width:${Math.max(0, x.w - 2)}px;height:${Math.max(0, x.h - 2)}px" title="${esc(`${x.k} · ${fV(x.v)} · ${fmtPct(x.v / tmTot, 1)}`)}" aria-label="${esc(`${x.k} · ${fV(x.v)} · ${fmtPct(x.v / tmTot, 1)}`)}">${lv ? `<b>${esc(x.k)}</b>` : ""}${lv >= 2 ? `<span class="num">${esc(fV(x.v))}</span>` : ""}${lv >= 3 ? `<span class="num muted">${esc(fmtPct(x.v / tmTot, 1))}</span>` : ""}</button>`);
+          el.onclick = () => { if (lvlCat) return; MSU.cgrp = x.cg || "__none"; draw(); };
+          if (lvlCat) el.style.cursor = "default";
+          box.appendChild(el); });
+      };
+      paint();
+      const ro = new ResizeObserver(() => paint()); ro.observe(box); charts.push({ destroy: () => ro.disconnect() });
 
       // ---- lifecycle ----
       const kinds = { rise: "ok", dec: "crit", dead: "warn", ghost: "crit", fresh: "info", stable: "mute" }, sc = { rise: "var(--ok)", dec: "var(--crit)", dead: "var(--warn)", ghost: "var(--pink)", fresh: "var(--accent)", stable: "var(--muted)" };
@@ -269,11 +299,12 @@ FMD.page("revenue/menu", {
       host.querySelector("#msLC .card-b").appendChild(UI.table([
         { key: "unit", label: t("Unit") }, { key: "name", label: t("Menu item") }, { key: "listing", label: t("Listing") },
         { key: "m1", label: LC.ms[0] ? monthName(LC.ms[0]) : "", type: "int" }, { key: "m2", label: LC.ms[1] ? monthName(LC.ms[1]) : "", type: "int" },
-        { key: "m3", label: LC.ms[2] ? monthName(LC.ms[2]) + (LC.open ? " *" : "") : "", type: "int" },
+        { key: "m3", label: LC.ms[2] ? monthName(LC.ms[2]) : "", type: "int" },
+        { key: "mtd", label: LC.mtdM ? t("{m} to date", { m: monthName(LC.mtdM) }) : "", type: "int" },
         { key: "trend", label: t("Trend"), sortable: false, copy: false, render: r => spark(r.v, sc[r.st]) },
         { key: "chg", label: t("Change"), type: "pct", render: r => r.chg == null ? '<span class="muted">—</span>' : `<span class="num" style="color:${r.chg >= 0 ? "var(--ok)" : "var(--crit)"}">${r.chg > 0 ? "+" : ""}${esc(fmtPct(r.chg, 0))}</span>` },
         { key: "stLabel", label: t("Status"), render: r => UI.tag(r.stLabel, kinds[r.st]) },
-      ].filter(c => c.label !== ""), { rows: lcRows, topN: 20, sort: { key: "m3", dir: "desc" }, emptyText: t("No items for the selected filters.") }));
+      ].filter(c => c.label !== ""), { rows: lcRows, topN: 20, sort: { key: LC.ms.length >= 3 ? "m3" : "m1", dir: "desc" }, emptyText: t("No items for the selected filters.") }));
     };
     draw();
     const onTheme = () => draw();

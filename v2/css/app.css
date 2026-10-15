@@ -5,6 +5,7 @@
   --orange:#F79A3E;--on-orange:#2A1600;--indigo-card:#2B2F9E;
   --crit:#B42318;--crit-bg:#FDECEC;--warn:#9A4A0C;--warn-bg:#FDEBD8;--info:#2B2F9E;--info-bg:#E6E8FB;--ok:#1F6B47;--ok-bg:#E2F4EA;
   --heat-hi:#F8D3D3;--heat-mid:#FCE3C7;--heat-lo:#D6E4FA;
+  --tm-food:#4F55C9;--tm-food-bg:#E3E4FA;--tm-bev:#E07B2E;--tm-bev-bg:#FCE6D3;--tm-event:#C2306B;--tm-event-bg:#FADCE7;--tm-other:#8A8FA8;--tm-other-bg:#ECEDF3;
   --radius-lg:28px;--radius-md:18px;--radius-sm:12px;
   --font:'Poppins',system-ui,-apple-system,"Segoe UI",sans-serif;--mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
   color-scheme:light;
@@ -14,6 +15,7 @@
   --accent:#8A90FF;--on-accent:#0F1124;--accent-soft:#262B55;--pink:#FF8FB8;--pink-soft:#3A2032;--fc:#6E74C9;--ev-bar:#3B3570;
   --indigo-card:#3A3FC4;
   --crit:#FF8A80;--crit-bg:#3A1D24;--warn:#F7B26B;--warn-bg:#3A2A18;--info:#AEB3FF;--info-bg:#262B55;--ok:#7EE0AE;--ok-bg:#163A2A;
+  --tm-food:#8A90FF;--tm-food-bg:#272B5A;--tm-bev:#F2A15F;--tm-bev-bg:#43301F;--tm-event:#FF8FB8;--tm-event-bg:#45233A;--tm-other:#A3A7C7;--tm-other-bg:#2A2E4A;
   --heat-hi:#5A2630;--heat-mid:#4E3A1F;--heat-lo:#22355A;color-scheme:dark;
 }}
 :root[data-theme="dark"]{
@@ -21,6 +23,7 @@
   --accent:#8A90FF;--on-accent:#0F1124;--accent-soft:#262B55;--pink:#FF8FB8;--pink-soft:#3A2032;--fc:#6E74C9;--ev-bar:#3B3570;
   --indigo-card:#3A3FC4;
   --crit:#FF8A80;--crit-bg:#3A1D24;--warn:#F7B26B;--warn-bg:#3A2A18;--info:#AEB3FF;--info-bg:#262B55;--ok:#7EE0AE;--ok-bg:#163A2A;
+  --tm-food:#8A90FF;--tm-food-bg:#272B5A;--tm-bev:#F2A15F;--tm-bev-bg:#43301F;--tm-event:#FF8FB8;--tm-event-bg:#45233A;--tm-other:#A3A7C7;--tm-other-bg:#2A2E4A;
   --heat-hi:#5A2630;--heat-mid:#4E3A1F;--heat-lo:#22355A;color-scheme:dark;
 }
 
@@ -198,3 +201,19 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px}
 .cs-list{max-height:520px;overflow:auto}
 button.pill{border:none;cursor:pointer;font-family:inherit}button.pill:hover{outline:2px solid currentColor;outline-offset:1px}
 .tbl.heat td.cell-on{outline:2px solid var(--accent);outline-offset:-2px}.tbl.heat td[data-c]{cursor:pointer}
+
+/* ---------- Treemap (Menu Sales) ---------- */
+.tm{position:relative;height:360px;border-radius:var(--radius-sm);overflow:hidden}
+.tm-tile{position:absolute;border:0;border-top:3px solid;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;overflow:hidden;font-size:12px;line-height:1.3;color:var(--ink);cursor:pointer}
+.tm-tile>*{flex-shrink:0}
+.tm-tile b{font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-tile .num{font-size:11.5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.tm-tile:hover,.tm-tile:focus-visible{filter:brightness(.96);outline:2px solid var(--accent);outline-offset:-2px}
+.tm-food{background:var(--tm-food-bg);border-color:var(--tm-food)}.tm-beverage{background:var(--tm-bev-bg);border-color:var(--tm-bev)}
+.tm-event{background:var(--tm-event-bg);border-color:var(--tm-event)}.tm-other{background:var(--tm-other-bg);border-color:var(--tm-other)}
+.sw.tm-food{background:var(--tm-food)}.sw.tm-beverage{background:var(--tm-bev)}.sw.tm-event{background:var(--tm-event)}.sw.tm-other{background:var(--tm-other)}
+
+/* ---------- Sembunyikan angka ---------- */
+[data-hide] #view :is(.num,.kpi-v,.kpi-n,.pill,canvas,p,.bul-v,.tm-tile .num,.kpi svg text),
+[data-hide] #view .banner,[data-hide] #view .tbl td:not(:first-child){filter:blur(7px);user-select:none}
+[data-hide] #hideBtn{background:var(--accent);color:var(--on-accent)}

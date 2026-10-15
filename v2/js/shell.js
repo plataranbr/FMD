@@ -201,11 +201,24 @@ async function startApp() {
   route();
 }
 
+/* ---------- Sembunyikan angka (share screen). Kosmetik saja: data tetap ada di browser. ---------- */
+const HIDE_KEY = "fmd.v2.hide";
+function applyHide(on) {
+  document.documentElement.toggleAttribute("data-hide", on);
+  const b = $("hideBtn"); if (!b) return;
+  b.setAttribute("aria-pressed", String(on)); b.title = on ? t("Numbers are hidden on this screen (for screen sharing). Data is still loaded in the browser.") : "";
+  b.innerHTML = (on
+    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>' + esc(t("Show numbers"))
+    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' + esc(t("Hide numbers")));
+}
 function wire() {
   $("loginBtn").onclick = doLogin;
   $("pin").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
   $("gSwitch").onclick = e => { e.preventDefault(); resetGoogle(); };
   $("signOut").onclick = signOut;
+  applyHide(Store.get("localStorage", HIDE_KEY) === "1");
+  $("hideBtn").onclick = () => { const on = !document.documentElement.hasAttribute("data-hide"); Store.set("localStorage", HIDE_KEY, on ? "1" : "0"); applyHide(on); };
+  document.addEventListener("fmd:lang", () => applyHide(document.documentElement.hasAttribute("data-hide")));
   $("themeBtn").onclick = () => { const t = isDark() ? "light" : "dark"; Store.set("localStorage", CFG.THEME_KEY, t); applyTheme(t); };
   $("refreshBtn").onclick = refreshAll;
   $("menuBtn").onclick = () => document.body.classList.toggle("nav-open");
