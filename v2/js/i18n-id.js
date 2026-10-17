@@ -1,6 +1,9 @@
 /* Terjemahan ID. Kunci = teks English persis seperti di kode ({var} wajib dipertahankan). */
 "use strict";
 const I18N_ID = {
+  "Direct purchases into the store are not counted as cost (cost comes from store requisitions): {l}.": "Belanja langsung yang masuk store tidak dihitung sebagai biaya (biayanya lewat pengambilan store/SR): {l}.",
+  "from {m}": "mulai {m}",
+  "+{x} into store": "+{x} masuk store",
   "Stopped selling": "Berhenti terjual",
   "Stopped selling + delisted still selling": "Berhenti terjual + dihapus masih terjual",
   "through {m}": "s.d. {m}",

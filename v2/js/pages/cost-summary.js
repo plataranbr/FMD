@@ -72,6 +72,7 @@ FMD.page("cost/summary", {
         <section class="card" style="padding:14px 18px;gap:10px"><div class="filters" id="csF1"></div><div id="csUnits"></div><div class="filters" id="csF2"></div>
           <span class="muted" style="font-size:12px">${esc(t("Targets: Summary {a} · DML {b} · SR/Transfer {c} (Food = Beverage)", { a: fmtPct(COST_TGT.SUM.F, 0), b: fmtPct(COST_TGT.DML.F, 0), c: fmtPct(COST_TGT.SRT.F, 0) }))}</span></section>
         ${warns.map(([k, w]) => UI.banner(w, k)).join("")}
+        ${storeDmlNote(keys, R.from, R.to)}
         <div class="banner ${closed ? "info" : "warn"}" role="note" style="align-items:center;gap:10px"><span class="tag ${closed ? "info" : "warn"}">${esc(t("PROVISIONAL"))}</span><span>${esc(basis)}</span></div>
         <section class="grid g4">
           ${UI.kpi({ label: t("Total Cost of Sales"), value: fmtRp(T.tot), showRing: false, note: t("DML {a} · SR/Transfer {b} · excl. CK", { a: fmt(rows.filter(r => !r.ck).reduce((s, r) => s + r.dml, 0)), b: fmt(rows.filter(r => !r.ck).reduce((s, r) => s + r.srt, 0)) }) })}

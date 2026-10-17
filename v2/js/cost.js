@@ -9,7 +9,12 @@ const COST_SETS = {
   full: COST_TABS,
 };
 const COST_BASE_TABS = ["Revenue_Master", "Forecast_Output", "DIM_UNIT", "DIM_TANGGAL"];
-const STORE_UNITS = ["PLD", "PLS", "PLMT", "CK", "TSMB", "PLSMM"];          // unit ber-store (sumber SR/transfer)
+/* Unit ber-store. Sumber utama: DIM_UNIT kolom Store_Since (YYYY-MM) & DML_To_Store (bucket DML yg masuk store, mis. "KITCHEN,BAR").
+   Cadangan di bawah dipakai bila kolom belum ada di DIM_UNIT (CK tidak ada di DIM -> selalu dari sini).
+   DML_To_Store kosong = DML dipakai langsung (biaya = DML + SR, logika FMD lama). */
+const STORE_FALLBACK = { PLD: "", PLS: "", PLMT: "", CK: "", TSMB: "", PLSMM: "2026-10" };   // "" = sejak awal
+const DML_TO_STORE_FALLBACK = { PLSMM: ["KITCHEN", "BAR"] };              // PLSMM: belanja Kitchen/Bar masuk store; Event langsung pakai
+const STORE_UNITS = Object.keys(STORE_FALLBACK);                          // kompatibilitas (daftar statis)
 const FG_CK_PREFIX = ["1117", "1118", "1119", "1120", "1121"];       // = FG_Master template CK
 const COST_TGT = { SUM: { F: 0.29, B: 0.29 }, DML: { F: 0.14, B: 0.14 }, SRT: { F: 0.15, B: 0.15 } };
 const LEAD_TIME_MIN = 4;                                             // hari; periode lebih pendek -> rasio bias naik
@@ -93,7 +98,8 @@ const Cost = {
     const U = {}, rel = { RELIABLE: 0, INDICATIVE: 0, INCOMPLETE: 0 }, day = {};
     (STATE.data.DML_Cost_Daily || []).forEach(r => { const u = r.Unit; if (!u || !this.inKeys(o, u) || !(r._d >= o.from && r._d <= o.to)) return;
       const k = this.key(u), b = String(r.Bucket || "").toUpperCase(), a = Number(r.Amount) || 0, rl = String(r.Reliability || "").toUpperCase();
-      const x = (U[k] = U[k] || { K: 0, B: 0, E: 0, G: 0, inc: 0, ind: 0 });
+      const x = (U[k] = U[k] || { K: 0, B: 0, E: 0, G: 0, S: 0, inc: 0, ind: 0 });
+      if (this.dmlToStore(k, b, r._d)) { x.S += a; return; }   // belanja masuk store: bukan biaya (biaya lewat SR)
       if (b === "KITCHEN") x.K += a; else if (b === "BAR") x.B += a; else if (b === "EVENT") x.E += a;
       if (rl === "INCOMPLETE") x.inc += a; else if (rl === "INDICATIVE") x.ind += a; rel[rl] = (rel[rl] || 0) + a;
       const dd = ((day[k] = day[k] || {})[r._d] = day[k][r._d] || { K: 0, B: 0, E: 0 });
@@ -101,6 +107,7 @@ const Cost = {
     // gas (LPG) dikeluarkan dari Kitchen kecuali dicentang
     const gas = {};
     (STATE.data.DML_Gas_Daily || []).forEach(r => { if (!this.inKeys(o, r.Unit) || !(r._d >= o.from && r._d <= o.to)) return; const k = this.key(r.Unit), a = Number(r.Amount) || 0;
+      if (this.dmlToStore(k, "KITCHEN", r._d)) return;   // LPG ikut belanja Kitchen yang masuk store
       gas[k] = (gas[k] || 0) + a; ((day[k] = day[k] || {})[r._d] = day[k][r._d] || { K: 0, B: 0, E: 0 }).G = (day[k][r._d].G || 0) + a; });
     Object.entries(U).forEach(([k, x]) => { x.G = gas[k] || 0; if (!o.gas) x.K = Math.max(0, x.K - x.G); });
     if (!o.gas) Object.values(day).forEach(dd => Object.values(dd).forEach(v => { if (v.G) v.K = Math.max(0, v.K - v.G); }));
@@ -109,9 +116,23 @@ const Cost = {
   consFilter(r, o) {
     const kat = String(r.Kategori || "").toUpperCase(); if (kat !== "FOOD" && kat !== "BEVERAGE") return false;
     const u = r.Unit_Beban; if (!u || !this.inKeys(o, u) || !(r._d >= o.from && r._d <= o.to)) return false;
-    const fromStore = STORE_UNITS.includes(String(r.Unit_Sumber || "").trim());
-    return STORE_UNITS.includes(u) || (String(r.Tipe || "").toUpperCase() === "TRANSFER" && fromStore);   // unit tanpa store: hanya transfer masuk
+    const fromStore = this.isStoreOn(String(r.Unit_Sumber || "").trim(), r._d);
+    return this.isStoreOn(u, r._d) || (String(r.Tipe || "").toUpperCase() === "TRANSFER" && fromStore);   // unit tanpa store: hanya transfer masuk
   },
+  /** peta store per kunci unit: {since:"YYYY-MM"|"" , toStore:Set(bucket)}; DIM_UNIT menimpa cadangan */
+  storeMap() { return memo("cost|storemap", () => {
+    const m = {};
+    Object.entries(STORE_FALLBACK).forEach(([u, s]) => (m[u] = { since: s, toStore: new Set(DML_TO_STORE_FALLBACK[u] || []) }));
+    const D = STATE.data.DIM_UNIT || [], hasCol = D.some(r => "Store_Since" in r);
+    if (hasCol) D.forEach(r => { const s = String(r.Store_Since ?? "").trim(), t = String(r.DML_To_Store ?? "").trim(); if (!s) return;
+      const ks = [String(r.Unit || "").trim().toUpperCase(), this.key(r.Unit)];
+      const v = s.toUpperCase() === "NONE" ? null : { since: /^\d{4}-\d{2}/.test(s) ? s.slice(0, 7) : "", toStore: new Set(t.toUpperCase().split(/[,;\s]+/).filter(Boolean)) };
+      ks.forEach(k => { if (k) { if (v) m[k] = v; else delete m[k]; } }); });
+    return m; }); },
+  /** unit u (kode apa pun) memakai store pada tanggal d */
+  isStoreOn(u, d) { if (!u) return false; const M = this.storeMap(), x = M[String(u).trim().toUpperCase()] || M[this.key(u)]; return !!x && (!x.since || String(d).slice(0, 7) >= x.since); },
+  /** DML bucket b milik kunci k pada tanggal d masuk store (bukan biaya; biayanya lewat SR) */
+  dmlToStore(k, b, d) { const x = this.storeMap()[k]; return !!x && x.toStore.size > 0 && x.toStore.has(String(b).toUpperCase()) && (!x.since || String(d).slice(0, 7) >= x.since); },
   isFgCK(r) { if (r.FG !== undefined) return String(r.FG).toUpperCase() === "Y"; if (String(r.Unit_Sumber || "").trim() !== "CK") return false; const a = String(r.ArtNo || ""); return a.length === 7 && FG_CK_PREFIX.some(p => a.startsWith(p)); },
   consRows(o) { return memo("cost|consrows|" + this.sig(o), () => {
     let rows = this.consSrc().filter(r => this.consFilter(r, o) && (!o.fgManual || !this.isFgCK(r)));
@@ -132,7 +153,7 @@ const Cost = {
       const dF = d.K + d.E, dB = d.B, cF = c.K, cB = c.B, F = dF + cF, B = dB + cB, tot = F + B;
       rows.push({ unit: k, name: this.name(k), ck: COST_CENTER_ONLY.has(k), since: this.since(k),
         K: d.K + c.K, Bk: d.B + c.B, E: d.E, dmlK: d.K, dmlB: d.B, dmlE: d.E, consK: c.K, consB: c.B,
-        dml: dF + dB, srt: cF + cB, cF: F, cB: B, tot, gas: d.G,
+        dml: dF + dB, dmlStore: d.S || 0, srt: cF + cB, cF: F, cB: B, tot, gas: d.G,
         revFood: rv.revFood, revBev: rv.revBev, revTot: rv.revTot, nAct: rv.nAct, nFc: rv.nFc, lastAct: rv.lastAct,
         pctFood: rv.revFood > 0 ? F / rv.revFood : null, pctBev: rv.revBev > 0 ? B / rv.revBev : null, pct: rv.revTot > 0 ? tot / rv.revTot : null,
         pctDml: rv.revTot > 0 ? (dF + dB) / rv.revTot : null, pctSrt: rv.revTot > 0 ? (cF + cB) / rv.revTot : null,
@@ -221,6 +242,12 @@ function subKategoriOf(r) {
 /** baris DML berupa LPG — sama dengan isi DML_Gas_Daily (diuji: Sep 2026 Rp 217 Mio identik) */
 const GAS_RE = /\bGAS\b|LPG|ELPIJI/i;
 const isGasLine = r => GAS_RE.test(String(r.Nama_Item || ""));
+/** banner: unit yang belanja DML-nya (sebagian) masuk store pada periode ini */
+function storeDmlNote(keys, from, to) {
+  const M = Cost.storeMap(), l = [...keys].filter(k => M[k] && M[k].toStore.size && (!M[k].since || to.slice(0, 7) >= M[k].since));
+  if (!l.length) return "";
+  return UI.banner(t("Direct purchases into the store are not counted as cost (cost comes from store requisitions): {l}.", { l: l.map(k => `${k} (${[...M[k].toStore].map(b => b.toLowerCase()).join(" + ")}${M[k].since ? " " + t("from {m}", { m: monthLabel(M[k].since) }) : ""})`).join("; ") }), "info");
+}
 Cost.consDetail = function (o, cls = "FB") {
   return memo("cost|cdet|" + this.sig(o) + "|" + cls, () => {
     const M = STATE.data.Consumption_Master || [];

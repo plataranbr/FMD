@@ -89,7 +89,7 @@ FMD.page("cost/dml", {
       const P = (key, cat) => r => r.ck ? csPill(r[key], 1) : csPillBtn(r[key], Cost.target("DML", cat, r.revFood, r.revBev), r.unit, cat || "T");
       const rr = sumRows.map(r => ({ ...r, f: r.dmlK + r.dmlE, b: r.dmlB, pf: r.revFood > 0 ? (r.dmlK + r.dmlE) / r.revFood : null, pb: r.revBev > 0 ? r.dmlB / r.revBev : null, pt: r.revTot > 0 ? r.dml / r.revTot : null }));
       const rt = UI.table([
-        { key: "unit", label: t("Unit"), render: r => `<b>${esc(r.unit)}</b>${r.ck ? " " + UI.tag(t("no revenue · excl."), "mute") : ""}<div class="muted" style="font-size:11px">${esc(r.name || "")}</div>` },
+        { key: "unit", label: t("Unit"), render: r => `<b>${esc(r.unit)}</b>${r.ck ? " " + UI.tag(t("no revenue · excl."), "mute") : ""}${r.dmlStore > 0 ? " " + UI.tag(t("+{x} into store", { x: fmt(r.dmlStore) }), "info") : ""}<div class="muted" style="font-size:11px">${esc(r.name || "")}</div>` },
         { key: "f", label: t("Food cost"), type: "money" }, { key: "revFood", label: t("Food revenue"), type: "money" }, { key: "pf", label: t("Food %"), type: "pct", render: P("pf", "F") },
         { key: "b", label: t("Bev. cost"), type: "money" }, { key: "revBev", label: t("Bev. revenue"), type: "money" }, { key: "pb", label: t("Bev. %"), type: "pct", render: P("pb", "B") },
         { key: "dml", label: t("Total"), type: "money" }, { key: "revTot", label: t("F&B revenue"), type: "money" }, { key: "pt", label: t("F&B %"), type: "pct", render: P("pt", null) },

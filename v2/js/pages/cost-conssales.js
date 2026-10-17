@@ -36,7 +36,7 @@ FMD.page("cost/cons-sales", {
         x.src.add(src); x.qty += qty; x.amt += amt; x.srcAmt[src] = (x.srcAmt[src] || 0) + amt; };
       Cost.consDetail(o, "FB").forEach(r => addL(String(r.Description || ""), t("Store req."), String(r.Kategori).toUpperCase() === "BEVERAGE", "SR", Number(r.Qty) || 0, Number(r.Amount) || 0, String(r.Kategori).toUpperCase() === "BEVERAGE" ? "BAR" : "KITCHEN"));
       const dmlOk = DmlDetail.byMonth && DmlDetail.byMonth[CVS.month];
-      if (dmlOk) DmlDetail.rows([CVS.month]).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !K.has(r._k)) return; addL(String(r.Nama_Item || ""), String(r.Kategori || ""), r.Bucket === "BAR", "DML", r.Qty, r._amt || 0, r.Bucket); });
+      if (dmlOk) DmlDetail.rows([CVS.month]).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !K.has(r._k) || Cost.dmlToStore(r._k, r.Bucket, r._d)) return; addL(String(r.Nama_Item || ""), String(r.Kategori || ""), r.Bucket === "BAR", "DML", r.Qty, r._amt || 0, r.Bucket); });
       const leftAll = Object.values(L).map(x => ({ ...x, amt: CVS.L.src === "both" ? x.amt : (x.srcAmt[CVS.L.src === "dml" ? "DML" : "SR"] || 0) })).filter(x => x.amt !== 0);
 
       // ---- kanan: penjualan menu ----
@@ -56,6 +56,7 @@ FMD.page("cost/cons-sales", {
       F.appendChild(UI.clusterSelect(CVS.cluster, v => { CVS.cluster = v; CVS.unit = "ALL"; draw(); }));
       F.appendChild(UI.select(t("Unit"), [["ALL", t("All units in cluster")]].concat(avail.map(k => [k, k + " — " + Cost.name(k)])), CVS.unit, v => { CVS.unit = v; CVS.L.sel.clear(); CVS.R.sel.clear(); draw(); }));
       const msg = [];
+      msg.push(storeDmlNote(keys, R.from, R.to));
       if (busy) msg.push(UI.banner(t("Loading menu sales and purchase lines…"), "info"));
       if (menuErr) msg.push(UI.banner(t("Menu data could not be loaded: {e}", { e: menuErr }), "crit"));
       if (dmlErr) msg.push(UI.banner(t("Purchase lines could not be loaded: {e}", { e: dmlErr }), "crit"));

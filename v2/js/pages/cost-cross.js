@@ -57,7 +57,7 @@ function crossPage(id, cls) {
             lines.push({ k: Cost.key(r.Unit_Beban), cat: sk === "RAW" ? (bev ? t("Store requisition · Beverage") : t("Store requisition · Food")) : t("CK {s}", { s: SK[sk] }), item: String(r.Description || "").trim().toUpperCase(),
               bev, amt: Number(r.Amount) || 0, qty: Number(r.Qty) || 0, src: "SR", who: r.Unit_Sumber || "", d: r._d }); });
           if (S.src !== "sr") { const ms = []; for (let m = R.from.slice(0, 7); m <= R.to.slice(0, 7); m = addMonths(m, 1)) ms.push(m);
-            if (ms.every(m => DmlDetail.byMonth && DmlDetail.byMonth[m])) DmlDetail.rows(ms).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !o.keys.has(r._k) || isGasLine(r)) return;   // tanpa LPG = basis Summary
+            if (ms.every(m => DmlDetail.byMonth && DmlDetail.byMonth[m])) DmlDetail.rows(ms).forEach(r => { if (!(r._d >= R.from && r._d <= R.to) || !o.keys.has(r._k) || isGasLine(r) || Cost.dmlToStore(r._k, r.Bucket, r._d)) return;   // tanpa LPG = basis Summary
               lines.push({ k: r._k, cat: String(r.Kategori || t("Uncategorised")), item: String(r.Nama_Item || "").trim().toUpperCase(), bev: r.Bucket === "BAR", amt: r._amt || 0, qty: r.Qty, src: "DML", who: String(r.Supplier || "").trim(), price: r._p, d: r._d }); }); }
         } else {
           Cost.consDetail(o, "SUP").forEach(r => lines.push({ k: Cost.key(r.Unit_Beban), cat: supCategory(r.Kategori), item: String(r.Description || "").trim().toUpperCase(), bev: false, sup: true,
@@ -95,6 +95,7 @@ function crossPage(id, cls) {
         if (loadErr) msgs.push(UI.banner(t("Purchase lines could not be loaded: {e}", { e: loadErr }), "crit"));
         const consLast = (STATE.data.Consumption_Master || []).reduce((m, r) => r._d > m ? r._d : m, "");
         if (consLast && consLast < R.to && (S.cls === "SUP" || S.src !== "dml")) msgs.push(UI.banner(t("Store requisitions are recorded through {d}; later days have no requisition data yet.", { d: dateLabel(consLast) }), "info"));
+        if (S.cls === "COGS" && S.src !== "sr") msgs.push(storeDmlNote(keys, R.from, R.to));
         host.querySelector("#xMsg").innerHTML = msgs.join("");
         host.querySelector("#xKpi").innerHTML = [
           UI.kpi({ label: S.cls === "COGS" ? t("Cost of Sales") : t("Supplies Issued"), value: fmtRp(totAmt), showRing: false, note: S.cls === "COGS" ? ({ all: t("DML + store requisitions"), dml: t("Direct purchases only"), sr: t("Store requisitions only") })[S.src] : t("Issued from store, by expense COA") }),
